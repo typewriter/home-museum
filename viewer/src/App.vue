@@ -8,7 +8,23 @@
   </div>
 </template>
 
+<script>
+import UIkit from 'uikit';
+import Icons from 'uikit/dist/js/uikit-icons';
+
+UIkit.use(Icons);
+
+export default {
+  name: "App",
+}
+</script>
+
 <style lang="scss">
+@import "../node_modules/uikit/src/scss/variables-theme.scss";
+@import "../node_modules/uikit/src/scss/mixins-theme.scss";
+
+@import "../node_modules/uikit/src/scss/uikit-theme.scss";
+
 #app {
   font-family: Avenir, Helvetica, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
