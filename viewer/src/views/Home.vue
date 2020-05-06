@@ -9,12 +9,16 @@
       <router-link to="/prototype/random">ランダム</router-link>
     </div>
     <div class="home uk-light uk-background-secondary">
-      <div class="uk-margin uk-height-large uk-flex uk-flex-middle uk-flex-center uk-background-cover uk-background-bottom-center" style="background-image: url('/waterlilies.jpg')">
+      <div class="uk-margin uk-height-medium uk-flex uk-flex-middle uk-flex-center uk-background-cover uk-background-bottom-center" style="background-image: url('/waterlilies.jpg')">
+        <div>
         <h1 class="uk-text-center uk-animation-fade uk-overlay-primary">Home museum (β)<br><small>画面いっぱいに美術作品を楽しもう</small></h1>
+        <br>
+        <span class="uk-overlay-primary">数十万点以上の美術作品を、画面いっぱいにスライドショーで楽しめるサービスです。</span>
+        </div>
       </div>
       <div class="uk-padding uk-animation-fade">
         <div>
-          <h2>画風で選ぶ</h2>
+          <h2>さっそく試してみる</h2>
         </div>
         <div class="uk-child-width-1-2@s uk-child-width-1-3@l" uk-grid>
           <div v-for="item in styles" :key="item[0]">
