@@ -42,7 +42,7 @@ get '/v1/random/:style?' do
   end
 
   # get image
-  record["image_url"] = IMAGE_STORE.getOrRetreive(record["id"], record["image_url"], "max").gsub(/\.\/public/, "")
+  record["image_url"] = IMAGE_STORE.getOrRetreive(record["id"], record["image_url"], "max").gsub(/^\./, "")
   json record
 end
 
