@@ -1,28 +1,23 @@
 #!/usr/bin/env ruby
 
 require "sinatra"
-require 'sinatra/cross_origin'
 require "sinatra/json"
 require "sqlite3"
-require "Rmagick"
+require "RMagick"
 require_relative "./image_store.rb"
 
 DATABASE_PATH = ENV['DATABASE_PATH'] || "./hm.db"
-DB = SQLite3::Database.new DATABASE_PATH
+DB = SQLite3::Database.new(DATABASE_PATH, { readonly: true })
 DB.results_as_hash = true
 
 IMAGE_PATH  = ENV['IMAGE_PATH'] || "./public/images"
 IMAGE_STORE = ImageStore.new(IMAGE_PATH)
 
-before do
-  response.headers['Access-Control-Allow-Origin'] = '*'
-end
-
-get '/' do
+get '/v1' do
   "Hello world!"
 end
 
-get '/random/:style?' do
+get '/v1/random/:style?' do
   records = 0
   if params['style']
     records = DB.get_first_value("select count(*) from images where style like ?", "%#{params['style']}%").to_i

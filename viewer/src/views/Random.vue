@@ -31,8 +31,8 @@ import Vue from 'vue'
 export default Vue.extend({
   name: 'Random',
   data: function() { return {
-    server: "http://localhost:4567",
-    apiPath: "/random/",  // APIエンドポイント
+    server: "",
+    apiPath: "/v1/random/",  // APIエンドポイント
     loading: true,       // 初期ロード
     loadingMessage: "作品情報を取得しています...",
     fullscreenTip: true, // フルスクリーン説明
