@@ -15,6 +15,7 @@ sql = <<-SQL
     id integer primary key,
     source text,
     category text,
+    style text,
     title text,
     artist text,
     date text,
@@ -41,6 +42,7 @@ def aic_loader(path)
     records << {
       source: 'AIC',
       category: json["classification_title"],
+      style: json["style_title"],
       title: json["title"],
       artist: json["artist_display"],
       date: json["date_display"],
@@ -75,12 +77,13 @@ records.each { |record|
 
   puts "insert: #{record[:source_url]}"
   sql = <<-SQL
-    insert into images(source, category, title, artist, date, medium, origin, dimensions, credit, description, source_url, image_url)
-      values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    insert into images(source, category, style, title, artist, date, medium, origin, dimensions, credit, description, source_url, image_url)
+      values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   SQL
   db.execute(sql,
              record[:source],
              record[:category],
+             record[:style],
              record[:title],
              record[:artist],
              record[:date],
