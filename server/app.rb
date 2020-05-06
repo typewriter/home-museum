@@ -22,7 +22,7 @@ get '/' do
   "Hello world!"
 end
 
-get '/random' do
+get '/random/:style?' do
   records = 0
   if params['style']
     records = DB.get_first_value("select count(*) from images where style like ?", "%#{params['style']}%").to_i
@@ -31,6 +31,7 @@ get '/random' do
   end
 
   random = Random.new(Time.now.to_i / 60 - (params['i'] || 0).to_i).rand(records)
+  #random = Random.new.rand(records)
 
   record = nil
   if params['style']

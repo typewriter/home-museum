@@ -1,12 +1,16 @@
 <template>
   <div>
     <div id="nav">
-      <router-link to="/about">人気のコレクション</router-link> |
-      <router-link to="/random">ランダム</router-link>
+      人気のコレクション(準備中) |
+      <router-link to="/prototype/random/japan">日本画</router-link> |
+      <router-link to="/prototype/random/impress">印象派</router-link> |
+      西洋画(準備中) |
+      陶芸作品(準備中) |
+      <router-link to="/prototype/random">ランダム</router-link>
     </div>
     <div class="home uk-light uk-background-secondary">
       <div class="uk-margin uk-height-large uk-flex uk-flex-middle uk-flex-center uk-background-cover uk-background-bottom-center" style="background-image: url('/waterlilies.jpg')">
-        <h1 class="uk-text-center uk-animation-fade uk-overlay-primary">Home museum<br><small>画面いっぱいに美術作品を楽しもう</small></h1>
+        <h1 class="uk-text-center uk-animation-fade uk-overlay-primary">Home museum (β)<br><small>画面いっぱいに美術作品を楽しもう</small></h1>
       </div>
       <div class="uk-padding uk-animation-fade">
         <div>
