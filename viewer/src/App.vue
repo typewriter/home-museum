@@ -1,9 +1,9 @@
 <template>
-  <div id="app">
+  <div id="app"> <!--
     <div id="nav">
-      <router-link to="/">Home</router-link> |
-      <router-link to="/about">About</router-link>
-    </div>
+      <router-link to="/about">人気のコレクション</router-link> |
+      <router-link to="/random">ランダム</router-link>
+    </div> -->
     <router-view />
   </div>
 </template>
@@ -20,7 +20,10 @@ export default {
 </script>
 
 <style lang="scss">
-@import "../node_modules/uikit/src/scss/variables-theme.scss";
+// @import "./styles/uikit-customs.scss";
+
+
+@import "@/styles/variables-hm.scss";
 @import "../node_modules/uikit/src/scss/mixins-theme.scss";
 
 @import "../node_modules/uikit/src/scss/uikit-theme.scss";
@@ -36,6 +39,7 @@ export default {
 #nav {
   padding: 30px;
 
+  /*
   a {
     font-weight: bold;
     color: #2c3e50;
@@ -44,5 +48,6 @@ export default {
       color: #42b983;
     }
   }
+  */
 }
 </style>
