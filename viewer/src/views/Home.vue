@@ -14,49 +14,26 @@
       </div>
       <div class="uk-padding uk-animation-fade">
         <div>
-          <h2>コレクション</h2>
+          <h2>画風で選ぶ</h2>
         </div>
-        <div class="uk-child-width-1-2@s" uk-grid>
-          <div>
-            <div class="uk-card uk-card-default">
-              <div class="uk-card-media-top">
-                <img src="/stacksofwheat-endofsummer.jpg">
+        <div class="uk-child-width-1-2@s uk-child-width-1-3@l" uk-grid>
+          <div v-for="item in styles" :key="item[0]">
+            <a :href="item[2]">
+            <div class="uk-card uk-card-default uk-card-large">
+              <div class="uk-card-media-top uk-height-medium uk-flex uk-flex-middle uk-flex-center">
+                <img :src="item[0]" class="uk-responsive-height uk-responsive-width">
               </div>
               <div class="uk-card-body">
-                <h3 class="uk-card-title">クロード・モネ</h3>
+                <h3 class="uk-card-title">{{ item[1] }}</h3>
               </div>
             </div>
+            </a>
           </div>
-          <div>
-            <div class="uk-card uk-card-default">
-              <div class="uk-card-media-top">
-                <img src="/stacksofwheat-endofsummer.jpg">
-              </div>
-              <div class="uk-card-body">
-                <h3 class="uk-card-title">クロード・モネ</h3>
-              </div>
-            </div>
-          </div>
-          <div>
-            <div class="uk-card uk-card-default">
-              <div class="uk-card-media-top">
-                <img src="/stacksofwheat-endofsummer.jpg">
-              </div>
-              <div class="uk-card-body">
-                <h3 class="uk-card-title">クロード・モネ</h3>
-              </div>
-            </div>
-          </div>
-          <div>
-            <div class="uk-card uk-card-default">
-              <div class="uk-card-media-top">
-                <img src="/stacksofwheat-endofsummer.jpg">
-              </div>
-              <div class="uk-card-body">
-                <h3 class="uk-card-title">クロード・モネ</h3>
-              </div>
-            </div>
-          </div>
+        </div>
+      </div>
+      <div class="uk-padding uk-animation-fade">
+        <div>
+          コレクションやその他機能は準備中です。
         </div>
       </div>
     </div>
@@ -66,6 +43,13 @@
 <script>
 export default {
   name: "Home",
+  data: () => { return {
+    styles: [
+      ["/underthewaveoff-kanagawa.jpg", "日本画", "/prototype/random/japan"],
+      ["/stacksofwheat-endofsummer.jpg", "印象派", "/prototype/random/impress"],
+      ["/vasewithloophandles.jpg", "シャッフル （陶芸等含む）", "/prototype/random"],
+    ]
+  }}
 };
 </script>
 
