@@ -15,3 +15,5 @@ services:
       - api
     ports:
       - "8080:80"
+    volumes:
+      - ./server/public:/app/public
