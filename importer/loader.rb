@@ -6,6 +6,8 @@ require "sqlite3"
 
 DATABASE_PATH = ENV['DATABASE_PATH'] || "./hm.db"
 db = SQLite3::Database.new DATABASE_PATH
+db.execute("PRAGMA journal_mode = WAL")
+db.execute("PRAGMA synchronous = NORMAL")
 
 # create table
 sql = <<-SQL
@@ -25,6 +27,12 @@ sql = <<-SQL
     source_url text,
     image_url text
   );
+
+  CREATE INDEX IF NOT EXISTS
+    images_style ON images (style);
+
+  CREATE UNIQUE INDEX IF NOT EXISTS
+    images_source ON images (source_url);
 SQL
 db.execute(sql)
 
@@ -157,3 +165,6 @@ records.each_slice(1000) { |slice_records|
     }
   }
 }
+
+db.execute("reindex")
+db.execute("vacuum")
