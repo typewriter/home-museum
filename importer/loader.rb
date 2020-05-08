@@ -84,9 +84,39 @@ def met_loader(path)
   records
 end
 
+def paris_loader(path)
+  records = []
+  db = LevelDB::DB.new path
+  db.each { |id, v|
+    json = JSON.parse(v)
+
+    next if !json["fieldVisuelsPrincipals"]&.first&.dig("entity","publicUrl")
+
+    json["fieldVisuelsPrincipals"].select{|e|e.dig("entity","publicUrl") != nil}.each_with_index { |principal, i|
+      records << {
+        source: 'Paris Musées',
+        category: (json["fieldOeuvreTypesObjet"] || []).map{|e|e.dig("entity","name")}.compact.join(','),
+        style: (json["fieldOeuvreThemeRepresente"] || []).map{|e|e.dig("entity","name")}.compact.join(','),
+        title: json["title"],
+        artist: (json["fieldOeuvreAuteurs"] || []).map{|e|e.dig("entity","fieldAuteurAuteur","entity","name")}.compact.join(','),
+        date: ((json.dig("fieldDateProduction","startYear") || "").to_s + "-" + (json.dig("fieldDateProduction","endYear") || "").to_s).gsub(/-$/,""),
+        medium: (json["fieldMateriauxTechnique"] || []).map{|e|e.dig("entity","name")}.compact.join(','),
+        origin: nil,
+        dimensions: nil,
+        credit: nil,
+        description: nil,
+        source_url: json["absolutePath"] + "?#{i}",
+        image_url: principal.dig("entity","publicUrl"),
+      }
+    }
+  }
+  records
+end
+
 # insert or update
 records = aic_loader(ARGV[0])
 records += met_loader(ARGV[1])
+records += paris_loader(ARGV[2])
 
 records.each_slice(1000) { |slice_records|
   db.transaction {
