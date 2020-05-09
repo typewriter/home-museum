@@ -11,10 +11,18 @@ class ImageStore
     # GET if not exists
     if !File.exists?(filename)
       STDERR.puts "Retreive: #{image_url} (save to #{filename})"
-      open(image_url) do |image|
-        open(filename, "w+b") do |file|
-          file.write(image.read)
+      begin
+        open(image_url) do |image|
+          open(filename, "w+b") do |file|
+            file.write(image.read)
+          end
         end
+      rescue OpenURI::HTTPError => ex
+        if ex.io.status.first == "308"
+          image_url = ex.io.meta["location"]
+          retry
+        end
+        raise ex
       end
     end
 
