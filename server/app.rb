@@ -1,17 +1,25 @@
 #!/usr/bin/env ruby
 
-require "sinatra"
-require "sinatra/json"
-require "sqlite3"
-require "RMagick"
+require "bundler/setup"
+require "active_record"
+Bundler.require
+
 require_relative "./image_store.rb"
 
 DATABASE_PATH = ENV['DATABASE_PATH'] || "./hm.db"
-DB = SQLite3::Database.new(DATABASE_PATH, { readonly: true })
-DB.results_as_hash = true
+# DB = SQLite3::Database.new(DATABASE_PATH, { readonly: true })
+# DB.results_as_hash = true
 
 IMAGE_PATH  = ENV['IMAGE_PATH'] || "./public/images"
 IMAGE_STORE = ImageStore.new(IMAGE_PATH)
+
+ActiveRecord::Base.establish_connection(
+  adapter: 'sqlite3',
+  database: DATABASE_PATH
+)
+
+class Image < ActiveRecord::Base
+end
 
 get '/v1' do
   "Hello world!"
@@ -20,9 +28,9 @@ end
 get '/v1/random/:style?' do
   records = 0
   if params['style']
-    records = DB.get_first_value("select count(*) from images where style like ?", "%#{params['style']}%").to_i
+    records = Image.where("style like ?", "%#{params['style']}%").count
   else
-    records = DB.get_first_value("select count(*) from images").to_i
+    records = Image.count
   end
 
   random = Random.new(Time.now.to_i / 60 - (params['i'] || 0).to_i).rand(records)
@@ -30,15 +38,9 @@ get '/v1/random/:style?' do
 
   record = nil
   if params['style']
-    query = <<-"SQL"
-      select * from images where style like ? order by id limit 1 offset #{random}
-    SQL
-    record = DB.get_first_row(query, "%#{params['style']}%")
+    record = Image.where("style like ?", "%#{params['style']}%").order(:id).limit(1).offset(random).first
   else
-    query = <<-"SQL"
-      select * from images order by id limit 1 offset #{random}
-    SQL
-    record = DB.get_first_row(query)
+    record = Image.order(:id).limit(1).offset(random).first
   end
 
   # get image
