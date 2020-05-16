@@ -56,7 +56,7 @@ export default Vue.extend({
           return response.json();
         }).then(json => {
           const imageUrl = this.server + json["image_url"]
-          const description = `${json["artist"]}<br><strong>${json["title"]}</strong><br><small>${json["date"]}<br>${json["medium"]}<br>${json["credit"]}</small><!-- ${json["description"]} -->`
+          const description = `${json["artist"] || ""}<br><strong>${json["title"] || ""}</strong><br><small>${json["date"] || ""}<br>${json["medium"] || ""}<br>${json["credit"] || ""}</small><!-- ${json["description"] || ""} -->`
           this.evenImage = `url("${imageUrl}")`
           this.evenDescription = description
           this.loadingMessage = "作品画像を取得しています..."
@@ -78,7 +78,7 @@ export default Vue.extend({
           return response.json();
         }).then(json => {
           const imageUrl = this.server + json["image_url"]
-          const description = `${json["artist"]}<br><strong>${json["title"]}</strong><br><small>${json["date"]}<br>${json["medium"]}<br>${json["credit"]}</small><!-- ${json["description"]} -->`
+          const description = `${json["artist"] || ""}<br><strong>${json["title"] || ""}</strong><br><small>${json["date"] || ""}<br>${json["medium"] || ""}<br>${json["credit"] || ""}</small><!-- ${json["description"] || ""} -->`
           if (this.even) {
             this.oddImage = `url("${imageUrl}")`
             this.oddDescription = description
