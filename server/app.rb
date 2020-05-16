@@ -19,6 +19,17 @@ ActiveRecord::Base.establish_connection(
 )
 
 class Image < ActiveRecord::Base
+  has_many :collection_images
+end
+
+class Collection < ActiveRecord::Base
+  has_many :collection_images
+  has_many :images, through: :collection_images
+end
+
+class CollectionImage < ActiveRecord::Base
+  belongs_to :collection
+  belongs_to :image
 end
 
 get '/v1' do
