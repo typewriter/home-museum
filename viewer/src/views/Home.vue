@@ -3,11 +3,11 @@
     <!--
     <div id="nav">
       人気のコレクション(準備中) |
-      <router-link to="/prototype/random/style/japan">日本画</router-link> |
-      <router-link to="/prototype/random/style/impress">印象派</router-link> |
+      <router-link to="/random/style/japan">日本画</router-link> |
+      <router-link to="/random/style/impress">印象派</router-link> |
       西洋画(準備中) |
       陶芸作品(準備中) |
-      <router-link to="/prototype/random">ランダム</router-link>
+      <router-link to="/random">ランダム</router-link>
     </div>
     -->
     <div class="home uk-light uk-background-secondary">
@@ -24,7 +24,7 @@
         </div>
         <div class="uk-child-width-1-2@s uk-child-width-1-3@l" uk-grid v-if="collections.length != 0">
           <div v-for="item in collections" :key="item['id']">
-            <a :href="'/prototype/random' + (item['id'] == 9999 ? '' : '/collection/' + item['id'])">
+            <a :href="'/random' + (item['id'] == 9999 ? '' : '/collection/' + item['id'])">
             <div class="uk-card uk-card-default uk-card-large">
               <div class="uk-card-media-top uk-height-medium uk-flex uk-flex-middle uk-flex-center">
                 <img :src="item['image_url']" class="uk-responsive-height uk-responsive-width">
@@ -52,9 +52,9 @@ export default {
   server: "",
     apiPath: "/v1/collection",
     styles: [
-      ["/underthewaveoff-kanagawa.jpg", "日本画", "/prototype/random/style/japan"],
-      ["/stacksofwheat-endofsummer.jpg", "印象派", "/prototype/random/style/impress"],
-      ["/vasewithloophandles.jpg", "シャッフル （陶芸等含む）", "/prototype/random"],
+      ["/underthewaveoff-kanagawa.jpg", "日本画", "/random/style/japan"],
+      ["/stacksofwheat-endofsummer.jpg", "印象派", "/random/style/impress"],
+      ["/vasewithloophandles.jpg", "シャッフル （陶芸等含む）", "/random"],
     ],
     collections: [],
   }},

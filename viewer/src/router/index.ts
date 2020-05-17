@@ -7,17 +7,17 @@ Vue.use(VueRouter);
 
 const routes: Array<RouteConfig> = [
   {
-    path: "/prototype/",
+    path: "/",
     name: "Home",
     component: Home
   },
   {
-    path: "/prototype/random",
+    path: "/random",
     name: "Random",
     component: Random
   },
   {
-    path: "/prototype/random/:type/:name",
+    path: "/random/:type/:name",
     name: "Random (type specified)",
     component: Random
   }
