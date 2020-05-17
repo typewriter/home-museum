@@ -58,7 +58,7 @@ export default {
         return response.json()
       }).then(json => {
         // eslint-disable-next-line @typescript-eslint/camelcase
-        this.collections = json.concat([{ id: 9999, title: "ランダム", count: "400000~", image_url: "/vasewithloophandles.jpg" }])
+        this.collections = json.concat([{ id: 9999, title: "ランダム (Random)", count: "400000~", image_url: "/vasewithloophandles.jpg" }])
       })
   },
   watch: {
