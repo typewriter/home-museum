@@ -9,7 +9,7 @@
         <transition name="fade" mode="out-in" appear>
           <div id="even" key="even" v-if="even" style="width: 100vw; height: 100vh;" class="uk-background-contain" v-bind:style="{ backgroundImage: evenImage }"><!-- :style="{ backgroundImage: 'url(' + require('@/assets/imgs/monet/stacksofwheat-endofsummer.jpg') + ')' }"> -->
             <transition name="fade">
-              <div v-if="fullscreenTip" class="uk-overlay uk-padding-small uk-overlay-primary uk-position-top-center uk-position-small">Enterキーを押すとフルスクリーンになります</div>
+              <div v-if="fullscreenTip" class="uk-overlay uk-padding-small uk-overlay-primary uk-position-center uk-position-small">作品は1分ごとに切り替わります<br><br>Enterキーを押すとフルスクリーンになります</div>
             </transition>
             <transition name="fade">
               <div v-if="description" class="uk-overlay uk-padding-small uk-overlay-primary uk-position-bottom-left uk-position-small uk-text-left" v-html="evenDescription"></div>

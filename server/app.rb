@@ -40,7 +40,7 @@ get '/v1/collection' do
   collections = Collection.all
   json collections.map { |collection|
     record = Image.find(collection.index_image_id)
-    collection.attributes.merge({ image_url: IMAGE_STORE.getOrRetreive(record["id"], record["image_url"], "max").gsub(/^\./, "") })
+    collection.attributes.merge({ image_url: IMAGE_STORE.getOrRetreive(record["id"], record["image_url"], "800").gsub(/^\./, ""), count: CollectionImage.where(collection_id: collection.id).count })
   }
 end
 

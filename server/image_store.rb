@@ -26,10 +26,21 @@ class ImageStore
       end
     end
 
-    # RESIZE if not exists
-    # FIXME: not supported
+    if size == "max"
+      return filename
+    end
 
-    # RETURN FILE PATH
-    filename
+    resized_filename = File.join(@path, "#{id}.#{size}.jpg")
+    if File.exist?(resized_filename)
+      return resized_filename
+    end
+
+    original = Magick::Image.read(filename).first
+    image = original.resize_to_fit(size)
+    image.write(resized_filename) {
+      self.quality = 80
+    }
+
+    return resized_filename
   end
 end

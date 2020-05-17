@@ -31,6 +31,7 @@
               </div>
               <div class="uk-card-body">
                 <h3 class="uk-card-title">{{ item['title'] }}</h3>
+                <p>作品数: {{ item['count'] }}</p>
               </div>
             </div>
             </a>
