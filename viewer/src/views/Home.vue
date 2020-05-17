@@ -24,7 +24,7 @@
         </div>
         <div class="uk-child-width-1-2@s uk-child-width-1-3@l" uk-grid v-if="collections.length != 0">
           <div v-for="item in collections" :key="item['id']">
-            <a :href="'/prototype/random/collection/' + item['id']">
+            <a :href="'/prototype/random' + (item['id'] == 9999 ? '' : '/collection/' + item['id'])">
             <div class="uk-card uk-card-default uk-card-large">
               <div class="uk-card-media-top uk-height-medium uk-flex uk-flex-middle uk-flex-center">
                 <img :src="item['image_url']" class="uk-responsive-height uk-responsive-width">
@@ -63,7 +63,8 @@ export default {
       .then(function(response) {
         return response.json();
       }).then(json => {
-        this.collections = json
+        // eslint-disable-next-line @typescript-eslint/camelcase
+        this.collections = json.concat([{ id: 9999, title: "ランダム", count: "400000~", image_url: "/vasewithloophandles.jpg" }])
       })
   }
 };
