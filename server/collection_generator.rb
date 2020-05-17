@@ -5,7 +5,7 @@ require_relative "./app.rb"
 author = "typewriter"
 
 generate_collections = [
-  { title: "浮世絵",
+  { title: "浮世絵 (Ukiyo-e)",
     index_art: "Numazu, Number 13, from the series Fifty-Three Stations",
     artists: [
       "Adachi Ginko",
@@ -95,7 +95,7 @@ generate_collections = [
     ]
   },
   {
-    title: "日本画・南画",
+    title: "日本画・南画 (Japanese-style painting, Nanga: a school of Chinese painting)",
     index_art: "Famous Themes for Painting Study Known as %The Garden of Painting",
     artists: [
       "Ike Taiga", # Typo
@@ -172,7 +172,7 @@ generate_collections = [
       "Kawase Hasui",
     ]
   },
-  { title: "バルビゾン派・印象派",
+  { title: "バルビゾン派・印象派 (École de Barbizon, Impressionism)",
     index_art: "Stacks of Wheat (End of Summer)",
     artists: [
       "Camille Pissarro",
@@ -212,7 +212,7 @@ generate_collections = [
       "Daubigny%Charles%Fran_ois",
     ]
   },
-  { title: "バロック絵画の時代",
+  { title: "バロック絵画の時代 (Baroque painting)",
     index_art: "Wolf and Fox Hunt",
     artists: [
       "Frans Hals",
