@@ -13,9 +13,9 @@
     <div class="home uk-light uk-background-secondary">
       <div class="uk-margin uk-height-medium uk-flex uk-flex-middle uk-flex-center uk-background-cover uk-background-bottom-center" style="background-image: url('/waterlilies.jpg')">
         <div>
-        <h1 class="uk-text-center uk-animation-fade uk-overlay-primary">Home museum (β)<br><small>画面いっぱいに美術作品を楽しもう</small></h1>
+        <h1 class="uk-text-center uk-animation-fade uk-overlay-primary">Uchibi<br><small>おうちで画面いっぱいに美術作品を楽しもう</small></h1>
         <br>
-        <span class="uk-overlay-primary">数十万点以上の美術作品を、画面いっぱいにスライドショーで楽しめるサービスです。</span>
+        <span class="uk-overlay-primary">40万点以上の美術作品を、画面いっぱいにスライドショーで楽しめるサービスです。</span>
         </div>
       </div>
       <div class="uk-padding uk-animation-fade">
@@ -41,6 +41,10 @@
           コレクションを読み込んでいます...
         </div>
       </div>
+    </div>
+    <div id="footer" class="uk-light uk-text-small uk-text-light">
+      本サービスは、自由に利用できるパブリックドメインの作品を用いています。<br>
+      Developer: たいぷらいたー（<a href="https://nyamikan.net/">にゃみかん</a>）
     </div>
   </div>
 </template>
