@@ -17,8 +17,8 @@ const routes: Array<RouteConfig> = [
     component: Random
   },
   {
-    path: "/prototype/random/:style",
-    name: "Random (style specified)",
+    path: "/prototype/random/:type/:name",
+    name: "Random (type specified)",
     component: Random
   }
 ];

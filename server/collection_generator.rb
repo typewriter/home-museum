@@ -6,6 +6,7 @@ author = "typewriter"
 
 generate_collections = [
   { title: "浮世絵",
+    index_art: "Numazu, Number 13, from the series Fifty-Three Stations",
     artists: [
       "Adachi Ginko",
       "Angyusai Enshi",
@@ -95,6 +96,7 @@ generate_collections = [
   },
   {
     title: "日本画・南画",
+    index_art: "Famous Themes for Painting Study Known as %The Garden of Painting",
     artists: [
       "Ike Taiga", # Typo
       "Ikeno Taiga",
@@ -171,6 +173,7 @@ generate_collections = [
     ]
   },
   { title: "バルビゾン派・印象派",
+    index_art: "Stacks of Wheat (End of Summer)",
     artists: [
       "Camille Pissarro",
       "Pissarro%Camille",
@@ -214,7 +217,13 @@ generate_collections = [
 generate_collections.each { |col|
   ActiveRecord::Base.transaction do
     collection = Collection.find_or_initialize_by(title: col[:title])
-    collection.attributes = { title: col[:title], author: author }
+
+    image = Image.where("title like ?", "%#{col[:index_art]}%").first
+    if !image
+      raise Error.new("image not found")
+    end
+
+    collection.attributes = { title: col[:title], author: author, index_image_id: image.id }
     collection.save!
 
     CollectionImage.where(collection_id: collection.id).delete_all

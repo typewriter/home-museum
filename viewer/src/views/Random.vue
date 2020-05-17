@@ -51,7 +51,7 @@ export default Vue.extend({
       this.fetchNextArtwork()
     },
     initialLoad() {
-      fetch(this.server + this.apiPath + (this.$route.params.style ? `${this.$route.params.style}` : "") + "?i=1")
+      fetch(this.server + this.apiPath + (this.$route.params.type ? `${this.$route.params.type}/${this.$route.params.name}` : "") + "?i=1")
         .then(function(response) {
           return response.json();
         }).then(json => {
@@ -73,7 +73,7 @@ export default Vue.extend({
     },
     fetchNextArtwork() {
       // fetch next artwork
-      fetch(this.server + this.apiPath + (this.$route.params.style ? `${this.$route.params.style}` : ""))
+      fetch(this.server + this.apiPath + (this.$route.params.type ? `${this.$route.params.type}/${this.$route.params.name}` : ""))
         .then(function(response) {
           return response.json();
         }).then(json => {

@@ -36,26 +36,32 @@ get '/v1' do
   "Hello world!"
 end
 
-get '/v1/random/:style?' do
-  records = 0
-  if params['style']
-    records = Image.where("style like ?", "%#{params['style']}%").count
-  else
-    records = Image.count
-  end
+get '/v1/collection' do
+  collections = Collection.all
+  json collections.map { |collection|
+    record = Image.find(collection.index_image_id)
+    collection.attributes.merge({ image_url: IMAGE_STORE.getOrRetreive(record["id"], record["image_url"], "max").gsub(/^\./, "") })
+  }
+end
 
+def random(query)
+  records = query.count
   random = Random.new(Time.now.to_i / 60 - (params['i'] || 0).to_i).rand(records)
-  #random = Random.new.rand(records)
-
-  record = nil
-  if params['style']
-    record = Image.where("style like ?", "%#{params['style']}%").order(:id).limit(1).offset(random).first
-  else
-    record = Image.order(:id).limit(1).offset(random).first
-  end
-
-  # get image
+  record = query.order(:id).limit(1).offset(random).first
   record["image_url"] = IMAGE_STORE.getOrRetreive(record["id"], record["image_url"], "max").gsub(/^\./, "")
-  json record
+  record
+end
+
+get '/v1/random/collection/:id' do
+  json random(Image.eager_load(:collection_images).where("collection_images.collection_id": params['id']))
+end
+
+get '/v1/random/style/:style' do
+  json random(Image.where("style like ?", "%#{params['style']}%"))
+
+end
+
+get '/v1/random' do
+  json random(Image)
 end
 

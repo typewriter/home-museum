@@ -30,6 +30,7 @@ sql = <<-SQL
     title text,
     author text,
     description text,
+    index_image_id text,
     tag text
   );
 
