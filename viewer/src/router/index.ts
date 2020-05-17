@@ -20,7 +20,22 @@ const routes: Array<RouteConfig> = [
     path: "/random/:type/:name",
     name: "Random (type specified)",
     component: Random
-  }
+  },
+  {
+    path: "/:lang/",
+    name: "Home",
+    component: Home
+  },
+  {
+    path: "/:lang/random",
+    name: "Random",
+    component: Random
+  },
+  {
+    path: "/:lang/random/:type/:name",
+    name: "Random (type specified)",
+    component: Random
+  },
 ];
 
 const router = new VueRouter({

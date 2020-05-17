@@ -3,13 +3,13 @@
     <transition name="fade" mode="out-in">
       <div id="loading" key="loading" v-if="loading">
         <div uk-spinner="ratio: 3"></div>
-        <br>{{ loadingMessage }}<br><small>（ネットワーク回線の状態によっては時間が掛かる場合があります）</small>
+        <br>{{ loadingMessage }}<br><small>{{ $t("random.dependNetwork") }}</small>
       </div>
       <div v-else key="display">
         <transition name="fade" mode="out-in" appear>
           <div id="even" key="even" v-if="even" style="width: 100vw; height: 100vh;" class="uk-background-contain" v-bind:style="{ backgroundImage: evenImage }"><!-- :style="{ backgroundImage: 'url(' + require('@/assets/imgs/monet/stacksofwheat-endofsummer.jpg') + ')' }"> -->
             <transition name="fade">
-              <div v-if="fullscreenTip" v-on:click="fullscreenTip = false" class="uk-overlay uk-padding-small uk-overlay-primary uk-position-center uk-position-small">作品は1分ごとに切り替わります<br><br>Enterキーを押すとフルスクリーンになります</div>
+              <div v-if="fullscreenTip" v-on:click="fullscreenTip = false" class="uk-overlay uk-padding-small uk-overlay-primary uk-position-center uk-position-small">{{ $t("random.switchInterval") }}<br><br>{{ $t("random.enterFullscreen") }}</div>
             </transition>
             <transition name="fade">
               <div v-if="description" class="uk-overlay uk-padding-small uk-overlay-primary uk-position-bottom-left uk-position-small uk-text-left" v-html="evenDescription"></div>
@@ -34,7 +34,7 @@ export default Vue.extend({
     server: "",
     apiPath: "/v1/random",  // APIエンドポイント
     loading: true,       // 初期ロード
-    loadingMessage: "作品情報を取得しています...",
+    loadingMessage: this.$t("random.retreiveArtworks"),
     fullscreenTip: true, // フルスクリーン説明
     even: true,          // どちらを表示しているか
     description: true,   // 説明表示
@@ -51,6 +51,8 @@ export default Vue.extend({
       this.fetchNextArtwork()
     },
     initialLoad() {
+      this.updateLang(this.$route.params.lang)
+      this.loadingMessage = this.$t("random.retreiveArtworks")
       fetch(this.server + this.apiPath + (this.$route.params.type ? `/${this.$route.params.type}/${this.$route.params.name}` : "") + "?i=1")
         .then(function(response) {
           return response.json();
@@ -59,7 +61,7 @@ export default Vue.extend({
           const description = `${json["artist"] || ""}<br><strong>${json["title"] || ""}</strong><br><small>${json["date"] || ""}<br>${json["medium"] || ""}<br>${json["credit"] || ""}</small><!-- ${json["description"] || ""} -->`
           this.evenImage = `url("${imageUrl}")`
           this.evenDescription = description
-          this.loadingMessage = "作品画像を取得しています..."
+          this.loadingMessage = this.$t("random.retreiveArtworksImage")
 
           // duplicate load
           const img = new Image()
@@ -104,6 +106,13 @@ export default Vue.extend({
         document.exitFullscreen();
       }
     },
+    updateLang(lang: any) {
+      if (!lang) {
+        lang = "ja"
+      }
+      this.$i18n.locale = lang
+      document.title = this.$t("random.pageTitle") as string
+    },
   },
   mounted() {
     document.addEventListener("keypress", (e) => {
@@ -112,7 +121,12 @@ export default Vue.extend({
       }
     }, false)
     this.initialLoad()
-  }
+  },
+  watch: {
+    '$route' (to, from) {
+      this.updateLang(to.params.lang)
+    }
+  },
 })
 </script>
 
