@@ -93,7 +93,7 @@ export default Vue.extend({
           const img = new Image()
           img.src = imageUrl
         })
-      setTimeout(() => this.description = false, 30000)
+      setTimeout(() => this.description = false, 50000)
       setTimeout(this.switch, 60000)
     },
     toggleFullscreen() {

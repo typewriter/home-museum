@@ -38,7 +38,8 @@
     </div>
     <div id="footer" class="uk-light uk-text-small uk-text-light">
       {{ $t("home.claim") }}<br>
-      Developer: {{ $t("home.developer")}} (<a href="https://nyamikan.net/">{{ $t("home.nyamikan") }}</a>)
+      Developer: {{ $t("home.developer")}} (<a href="https://nyamikan.net/">{{ $t("home.nyamikan") }}</a>)<br>
+      <a href="https://www.nyamikan.net/privacy_policy.html">Privacy policy</a>
     </div>
   </div>
 </template>

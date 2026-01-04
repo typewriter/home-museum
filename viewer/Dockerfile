@@ -1,4 +1,4 @@
-FROM node:slim as builder
+FROM node:14-slim as builder
 WORKDIR /app
 ADD package*.json ./
 RUN npm install
