@@ -16,7 +16,7 @@ module Met
 
       print "#{Time.now.iso8601(6)}\t"
       print "#{id}...\t"
-      sleep 0.1
+      sleep 0.5
 
       response = Net::HTTP.get_response(URI.parse("https://collectionapi.metmuseum.org/public/collection/v1/objects/#{id}"))
       if response.code == "200" && response.body

@@ -50,7 +50,7 @@ module ParisMusees
 
           }
         }
-        fieldVisuelsPrincipals {
+        fieldVisuels {
           entity {
             name
             vignette
@@ -217,11 +217,13 @@ module ParisMusees
   end
 
   def import
-    graphql_endpoint = "http://apicollections.parismusees.paris.fr/graphql"
-    token = ENV['TOKEN']
+    graphql_endpoint = "https://apicollections.parismusees.paris.fr/graphql"
+    token = ENV['PARIS_TOKEN']
 
     db = KVStore.new "#{File.dirname(__FILE__)}/parismusees.lmdb"
-    offset = 0
+    # 取得済み件数を再開位置として使う (offset ページングは created ASC 順で連続しているため)
+    offset = db.count
+    puts "#{Time.now.iso8601(6)}\tresuming from offset #{offset}"
     loop {
       sleep 10
 
