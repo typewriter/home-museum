@@ -1,7 +1,7 @@
 require 'net/http'
 require 'uri'
 require 'json'
-require 'leveldb'
+require_relative 'kv_store'
 require 'time'
 
 module ParisMusees
@@ -220,7 +220,7 @@ module ParisMusees
     graphql_endpoint = "http://apicollections.parismusees.paris.fr/graphql"
     token = ENV['TOKEN']
 
-    db = LevelDB::DB.new "#{File.dirname(__FILE__)}/parismusees.leveldb"
+    db = KVStore.new "#{File.dirname(__FILE__)}/parismusees.lmdb"
     offset = 0
     loop {
       sleep 10

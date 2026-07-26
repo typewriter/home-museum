@@ -1,6 +1,6 @@
 #!/usr/bin/env ruby
 
-require "leveldb"
+require_relative "kv_store"
 require "json"
 require "sqlite3"
 
@@ -36,7 +36,7 @@ db.execute("CREATE UNIQUE INDEX IF NOT EXISTS images_source ON images (source_ur
 
 def aic_loader(path)
   records = []
-  db = LevelDB::DB.new path
+  db = KVStore.new path
   db.each { |id, v|
     json = JSON.parse(v)
     next if !json["is_public_domain"]
@@ -63,7 +63,7 @@ end
 
 def met_loader(path)
   records = []
-  db = LevelDB::DB.new path
+  db = KVStore.new path
   db.each { |id, v|
     json = JSON.parse(v)
 
@@ -91,13 +91,13 @@ end
 
 def paris_loader(path)
   records = []
-  db = LevelDB::DB.new path
+  db = KVStore.new path
   db.each { |id, v|
     json = JSON.parse(v)
 
-    next if !json["fieldVisuelsPrincipals"]&.first&.dig("entity","publicUrl")
+    next if !json["fieldVisuels"]&.first&.dig("entity","publicUrl")
 
-    json["fieldVisuelsPrincipals"].select{|e|e.dig("entity","publicUrl") != nil}.each_with_index { |principal, i|
+    json["fieldVisuels"].select{|e|e.dig("entity","publicUrl") != nil}.each_with_index { |principal, i|
       records << {
         source: 'Paris Musées',
         category: (json["fieldOeuvreTypesObjet"] || []).map{|e|e.dig("entity","name")}.compact.join(','),
@@ -144,21 +144,21 @@ records.each_slice(1000) { |slice_records|
         insert into images(source, category, style, title, artist, date, medium, origin, dimensions, credit, description, source_url, image_url)
           values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       SQL
-      db.execute(sql,
-                 record[:source],
-                 record[:category],
-                 record[:style],
-                 record[:title],
-                 record[:artist],
-                 record[:date],
-                 record[:medium],
-                 record[:origin],
-                 record[:dimensions],
-                 record[:credit],
-                 record[:description],
-                 record[:source_url],
-                 record[:image_url]
-                )
+      db.execute(sql, [
+                   record[:source],
+                   record[:category],
+                   record[:style],
+                   record[:title],
+                   record[:artist],
+                   record[:date],
+                   record[:medium],
+                   record[:origin],
+                   record[:dimensions],
+                   record[:credit],
+                   record[:description],
+                   record[:source_url],
+                   record[:image_url]
+                 ])
     }
   }
 }

@@ -1,7 +1,7 @@
 require 'net/http'
 require 'uri'
 require 'json'
-require 'leveldb'
+require_relative 'kv_store'
 require 'time'
 
 module Met
@@ -9,10 +9,10 @@ module Met
     response = Net::HTTP.get_response(URI.parse('https://collectionapi.metmuseum.org/public/collection/v1/objects'))
     json = JSON.parse(response.body)
 
-    db = LevelDB::DB.new "#{File.dirname(__FILE__)}/met.leveldb"
+    db = KVStore.new "#{File.dirname(__FILE__)}/met.lmdb"
     json["objectIDs"].each { |object_id|
       id = object_id.to_s
-      next if db.includes?(id)
+      next if db.has?(id)
 
       print "#{Time.now.iso8601(6)}\t"
       print "#{id}...\t"

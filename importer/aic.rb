@@ -1,14 +1,14 @@
 require 'net/http'
 require 'uri'
 require 'json'
-require 'leveldb'
+require_relative 'kv_store'
 require 'time'
 
 module AIC
   def import
     url = "https://aggregator-data.artic.edu/api/v1/artworks?limit=100"
 
-    db = LevelDB::DB.new "#{File.dirname(__FILE__)}/aic.leveldb"
+    db = KVStore.new "#{File.dirname(__FILE__)}/aic.lmdb"
 
     loop {
       sleep 10

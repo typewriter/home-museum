@@ -54,3 +54,15 @@ build-iPhoneSimulator/
 
 # Used by RuboCop. Remote config files pulled in from inherit_from directive.
 # .rubocop-https?--*
+
+# Crawler LMDB stores (raw crawl data, not source)
+*.lmdb/
+
+# SQLite output database (not part of the repo)
+*.db
+
+# direnv local environment (contains secrets, e.g. PARIS_TOKEN)
+.envrc
+
+# Crawler resume markers
+*.resume
