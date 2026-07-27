@@ -55,6 +55,7 @@ module ParisMusees
             name
             vignette
             publicUrl
+            fieldImageLibre
           }
         }
         fieldDateProduction {
