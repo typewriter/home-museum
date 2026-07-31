@@ -59,7 +59,10 @@ build-iPhoneSimulator/
 *.lmdb/
 
 # SQLite output database (not part of the repo)
+# -wal/-shm are removed by DB.finalize, but linger if a script dies mid-run
 *.db
+*.db-wal
+*.db-shm
 
 # direnv local environment (contains secrets, e.g. PARIS_TOKEN)
 .envrc
