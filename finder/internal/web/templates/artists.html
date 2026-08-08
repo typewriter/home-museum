@@ -1,0 +1,62 @@
+{{define "content"}}
+{{$d := .Data}}{{$p := $d.P}}{{$res := $d.Res}}
+<h1>作者 <span class="muted">normalize_person.rb が作った名寄せ結果 (artists)</span></h1>
+
+<form class="filters" method="get" action="/artists/">
+  <div class="row main">
+    <input type="search" name="q" value="{{$p.Q}}" placeholder="代表表記に部分一致 (例: Monet)" autofocus>
+    <label>典拠
+      <select name="kind">
+        <option value="">問わず</option>
+        <option value="ulan" {{if eq $p.KeyKind "ulan"}}selected{{end}}>ulan (Getty ULAN)</option>
+        <option value="wd" {{if eq $p.KeyKind "wd"}}selected{{end}}>wd (Wikidata)</option>
+        <option value="cluster" {{if eq $p.KeyKind "cluster"}}selected{{end}}>cluster (機械的に寄せた)</option>
+      </select>
+    </label>
+    <label>作品数 <input type="number" name="min" value="{{if $p.MinN}}{{$p.MinN}}{{end}}" placeholder="以上" size="5"></label>
+    <label>並び
+      <select name="sort">
+        <option value="" {{if eq $p.Sort ""}}selected{{end}}>作品数の多い順</option>
+        <option value="name" {{if eq $p.Sort "name"}}selected{{end}}>名前順</option>
+      </select>
+    </label>
+    <button type="submit">検索</button>
+    <a class="btn ghost" href="/artists/unmatched">名寄せ漏れを見る</a>
+  </div>
+</form>
+
+<p class="summary">{{comma $res.Total}}{{if $res.Capped}}+{{end}} 人
+  <span class="muted">({{dur $res.Elapsed}})</span></p>
+
+{{if $res.Rows}}
+<div class="tablewrap">
+<table class="grid">
+  <thead><tr><th>代表表記</th><th>生没</th><th>典拠</th><th>person_key</th>
+    <th class="num">作品数</th><th class="num">エントリ数</th><th></th></tr></thead>
+  <tbody>
+  {{range $res.Rows}}
+    <tr>
+      <td><a href="/artists/detail?key={{.PersonKey}}">{{.DisplayName}}</a></td>
+      <td class="muted">{{orElse "—" .LifeSpan}}</td>
+      <td><span class="kind {{.KeyKind}}">{{.KeyKind}}</span></td>
+      <td><code class="muted">{{trunc 44 .PersonKey}}</code></td>
+      <td class="num">{{comma .ImageCount}}</td>
+      <td class="num">{{comma .EntryCount}}</td>
+      <td><a href="/?person_key={{.PersonKey}}">作品を見る</a></td>
+    </tr>
+  {{end}}
+  </tbody>
+</table>
+</div>
+
+<nav class="pager">
+  {{if $res.HasPrev}}<a href="{{urlWith $d.Query "page" (printf "%d" (add $res.Page -1))}}">← 前</a>{{end}}
+  <span>{{$res.Page}}</span>
+  {{if $res.HasNext}}<a href="{{urlWith $d.Query "page" (printf "%d" (add $res.Page 1))}}">次 →</a>{{end}}
+</nav>
+{{else}}
+<p class="muted">該当なし。</p>
+{{end}}
+
+<details class="sqlpanel"><summary>実行した SQL</summary><pre>{{$res.SQL}}</pre></details>
+{{end}}

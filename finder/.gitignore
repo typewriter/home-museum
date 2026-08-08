@@ -1,0 +1,21 @@
+# finder が作る検索インデックス (hm.db から再生成できる)
+index.db
+index.db-wal
+index.db-shm
+index.db.building*
+
+# ビルド成果物
+/finder
+
+# 画像キャッシュの状態
+cache.db
+cache.db-wal
+cache.db-shm
+
+# -images local:<dir> の保管先。ディレクトリ名は任意に指定できるので、
+# 別の名前を使うならここに足すこと (館から取った画像をコミットしないため)。
+#
+# 先頭の / は必須。付けないと internal/imagecache/ (ソース) にもマッチして
+# パッケージごとコミットから消える。
+/imagecache/
+/localcache/

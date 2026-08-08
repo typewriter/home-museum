@@ -1,0 +1,127 @@
+{{define "content"}}
+{{$d := .Data}}{{$s := $d.S}}
+<h1>カバレッジ <span class="muted">派生層がどこまで埋まったか</span></h1>
+<p class="meta">
+  集計 {{$d.ComputedAt.Format "2006-01-02 15:04:05"}}
+  <span class="muted">({{dur $s.Elapsed}} / 10 分キャッシュ)</span>
+  <a class="btn ghost" href="/stats?refresh=1">再集計</a>
+</p>
+
+<section>
+  <h2>ソース別</h2>
+  <div class="tablewrap">
+  <table class="grid cov">
+    <thead><tr>
+      <th>source</th><th class="num">作品</th>
+      <th class="num">館の年</th><th class="num">image_dates</th><th class="num">訳題</th>
+      <th class="num">作者エントリ</th><th class="num">role_bucket</th><th class="num">person_key</th><th class="num">作者名の訳</th>
+    </tr></thead>
+    <tbody>
+      {{range $s.Sources}}
+      <tr>
+        <td class="src">{{.Source}}</td>
+        <td class="num">{{comma .Images}}</td>
+        {{template "cov" dict "n" .DateRaw "p" .PctDateRaw}}
+        {{template "cov" dict "n" .DateNorm "p" .PctDateNorm}}
+        {{template "cov" dict "n" .TitleJa "p" .PctTitleJa}}
+        <td class="num">{{comma .Entries}}</td>
+        {{template "cov" dict "n" .RoleBucket "p" .PctRole}}
+        {{template "cov" dict "n" .PersonKey "p" .PctPerson}}
+        {{template "cov" dict "n" .ArtistJa "p" .PctArtistJa}}
+      </tr>
+      {{end}}
+      <tr class="total">
+        <td>合計</td>
+        <td class="num">{{comma $s.Totals.Images}}</td>
+        {{template "cov" dict "n" $s.Totals.DateRaw "p" $s.Totals.PctDateRaw}}
+        {{template "cov" dict "n" $s.Totals.DateNorm "p" $s.Totals.PctDateNorm}}
+        {{template "cov" dict "n" $s.Totals.TitleJa "p" $s.Totals.PctTitleJa}}
+        <td class="num">{{comma $s.Totals.Entries}}</td>
+        {{template "cov" dict "n" $s.Totals.RoleBucket "p" $s.Totals.PctRole}}
+        {{template "cov" dict "n" $s.Totals.PersonKey "p" $s.Totals.PctPerson}}
+        {{template "cov" dict "n" $s.Totals.ArtistJa "p" $s.Totals.PctArtistJa}}
+      </tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="muted">左 3 列の母数は作品数、右 3 列の母数は作者エントリ数。</p>
+</section>
+
+<div class="cols">
+  <section>
+    <h2>date_precision <span class="muted">image_dates</span></h2>
+    {{template "table" $s.Precision}}
+  </section>
+  <section>
+    <h2>role_bucket <span class="muted">image_artists</span></h2>
+    {{template "table" $s.RoleBucket}}
+  </section>
+  <section>
+    <h2>person_key の出どころ</h2>
+    {{template "table" $s.KeyKinds}}
+  </section>
+</div>
+
+<section>
+  <h2>世紀別の分布</h2>
+  {{template "table" $s.Centuries}}
+</section>
+
+{{with $d.Cache}}
+<section>
+  <h2>画像キャッシュ <span class="muted">{{$d.CacheDesc}}</span></h2>
+  <div class="tablewrap">
+  <table class="grid">
+    <thead><tr><th>source</th><th class="num">取得待ち</th><th class="num">取得済み</th>
+      <th class="num">再試行待ち</th><th class="num">取得不能</th><th class="num">容量</th>
+      <th>待ち時間の目安</th></tr></thead>
+    <tbody>
+      {{range .BySource}}
+      <tr>
+        <td class="src">{{.Source}}</td>
+        <td class="num">{{comma .Queued}}</td>
+        <td class="num">{{comma .Ready}}</td>
+        <td class="num">{{comma .Failed}}</td>
+        <td class="num">{{comma .Gone}}</td>
+        <td class="num">{{mib .Bytes}}</td>
+        <td class="muted">{{.ETAText}}</td>
+      </tr>
+      {{end}}
+      <tr class="total">
+        <td>合計</td>
+        <td class="num">{{comma (index .ByState "queued")}}</td>
+        <td class="num">{{comma (index .ByState "ready")}}</td>
+        <td class="num">{{comma (index .ByState "failed")}}</td>
+        <td class="num">{{comma (index .ByState "gone")}}</td>
+        <td class="num">{{mib .Bytes}}</td>
+        <td class="muted">館ごと {{.Interval}} に 1 回</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="muted">取得不能 (gone) は 404 / 410 / 画像でないもの、および 8 回失敗したもの。二度と館に取りに行きません。</p>
+</section>
+{{end}}
+
+<section>
+  <h2>索引 (index.db)</h2>
+  {{if $s.Index.Present}}
+  <table class="grid kv">
+    <tr><th>パス</th><td><code>{{$s.Index.Path}}</code></td></tr>
+    <tr><th>作成</th><td>{{$s.Index.BuiltAt}}</td></tr>
+    <tr><th>スキーマ版</th><td>{{$s.Index.SchemaVersion}}</td></tr>
+    <tr><th>サイズ</th><td>{{mib $s.Index.SizeBytes}}</td></tr>
+    <tr><th>索引した作品数</th><td>{{comma $s.Index.IndexedImages}} <span class="muted">(現在 {{comma $s.Index.CurrentImages}})</span></td></tr>
+    <tr><th>状態</th><td>{{if $s.Index.Stale}}<span class="null">古い — 作り直してください</span>{{else}}最新{{end}}</td></tr>
+  </table>
+  {{else}}
+  <p class="muted">index.db がありません。</p>
+  {{end}}
+</section>
+{{end}}
+
+{{define "cov"}}
+<td class="num cov{{if ge .p 99.0}} full{{else if lt .p 1.0}} zero{{end}}">
+  {{comma .n}}<span class="muted">{{pct .p}}</span>
+</td>
+{{end}}

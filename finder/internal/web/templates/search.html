@@ -1,0 +1,170 @@
+{{define "content"}}
+{{$d := .Data}}{{$p := $d.P}}{{$res := $d.Res}}{{$f := $d.Facets}}
+<form class="filters" method="get" action="/">
+  <div class="row main">
+    <input type="search" name="q" id="q" value="{{$p.Q}}" placeholder="キーワード (原題・訳題・作者・説明文・技法など)" autofocus>
+    <input type="search" name="artist" value="{{$p.Artist}}" placeholder="作者名" size="20">
+    <button type="submit">検索</button>
+    <a class="btn ghost" href="/">条件をクリア</a>
+  </div>
+
+  <details class="advanced" {{if or $p.Style $p.Category $p.Medium $p.Origin $p.YearFrom $p.YearTo $p.Sources $p.Precision $p.HasJa $p.ArtistCond}}open{{end}}>
+    <summary>絞り込み</summary>
+
+    <div class="row">
+      <fieldset>
+        <legend>ソース</legend>
+        {{range index $f "source"}}
+          <label class="chk"><input type="checkbox" name="source" value="{{.Value}}"
+            {{if has $p.Sources .Value}}checked{{end}}> {{.Value}} <span class="muted">{{comma .N}}</span></label>
+        {{end}}
+      </fieldset>
+
+      <fieldset>
+        <legend>制作年</legend>
+        <input type="number" name="year_from" value="{{if $p.YearFrom}}{{$p.YearFrom}}{{end}}" placeholder="から" size="6">
+        〜
+        <input type="number" name="year_to" value="{{if $p.YearTo}}{{$p.YearTo}}{{end}}" placeholder="まで" size="6">
+        <span class="hint">紀元前は負数 (例: -500)。期間が重なる作品を拾います</span>
+        <label>出どころ
+          <select name="year_kind">
+            <option value="">問わず</option>
+            <option value="normalized" {{if eq $p.YearKind "normalized"}}selected{{end}}>正規化済み (image_dates)</option>
+            <option value="raw" {{if eq $p.YearKind "raw"}}selected{{end}}>館の生値のみ</option>
+            <option value="none" {{if eq $p.YearKind "none"}}selected{{end}}>年が無い</option>
+          </select>
+        </label>
+        {{with index $f "date_precision"}}
+        <div class="chips">
+          {{range .}}<label class="chk"><input type="checkbox" name="precision" value="{{.Value}}"
+            {{if has $p.Precision .Value}}checked{{end}}> {{.Value}} <span class="muted">{{comma .N}}</span></label>{{end}}
+        </div>
+        {{end}}
+      </fieldset>
+    </div>
+
+    <div class="row">
+      <label>style
+        <select name="style">
+          <option value="">(問わず)</option>
+          {{range index $f "style"}}<option value="{{.Value}}" {{if eq $p.Style .Value}}selected{{end}}>{{.Value}} ({{comma .N}})</option>{{end}}
+        </select>
+      </label>
+      <label>category <input type="search" name="category" value="{{$p.Category}}" list="categories" placeholder="部分一致"></label>
+      <label>medium <input type="search" name="medium" value="{{$p.Medium}}" placeholder="部分一致"></label>
+      <label>origin <input type="search" name="origin" value="{{$p.Origin}}" placeholder="部分一致"></label>
+      <datalist id="categories">{{range index $f "category"}}<option value="{{.Value}}">{{end}}</datalist>
+    </div>
+
+    <div class="row">
+      <label>日本語訳
+        <select name="has_ja">
+          <option value="">問わず</option>
+          <option value="1" {{if eq $p.HasJa "1"}}selected{{end}}>訳あり</option>
+          <option value="0" {{if eq $p.HasJa "0"}}selected{{end}}>訳なし</option>
+        </select>
+      </label>
+      <label>作者
+        <select name="artist_cond">
+          <option value="">問わず</option>
+          <option value="unmatched" {{if eq $p.ArtistCond "unmatched"}}selected{{end}}>名寄せ漏れ (person_key なし)</option>
+          <option value="none" {{if eq $p.ArtistCond "none"}}selected{{end}}>作者エントリなし</option>
+        </select>
+      </label>
+      <label>並び
+        <select name="sort">
+          <option value="" {{if eq $p.Sort ""}}selected{{end}}>関連度</option>
+          <option value="year_asc" {{if eq $p.Sort "year_asc"}}selected{{end}}>制作年 古い順</option>
+          <option value="year_desc" {{if eq $p.Sort "year_desc"}}selected{{end}}>制作年 新しい順</option>
+          <option value="title" {{if eq $p.Sort "title"}}selected{{end}}>原題</option>
+          <option value="id" {{if eq $p.Sort "id"}}selected{{end}}>ID 昇順</option>
+          <option value="id_desc" {{if eq $p.Sort "id_desc"}}selected{{end}}>ID 降順</option>
+        </select>
+      </label>
+      <label>件数
+        <select name="per">
+          <option value="25" {{if eq $p.Per 25}}selected{{end}}>25</option>
+          <option value="50" {{if eq $p.Per 50}}selected{{end}}>50</option>
+          <option value="100" {{if eq $p.Per 100}}selected{{end}}>100</option>
+          <option value="200" {{if eq $p.Per 200}}selected{{end}}>200</option>
+        </select>
+      </label>
+      <label class="chk"><input type="checkbox" name="like" value="1" {{if $p.Like}}checked{{end}}> LIKE で引く (索引を使わない)</label>
+      <label class="chk"><input type="checkbox" name="raw" value="1" {{if $p.Raw}}checked{{end}}> FTS5 の式をそのまま渡す</label>
+      {{if $.Images}}
+      <label class="chk"><input type="checkbox" name="thumbs" value="1" {{if $d.Thumbs}}checked{{end}}> サムネイルを出す</label>
+      {{end}}
+    </div>
+  </details>
+  {{if $p.PersonKey}}<input type="hidden" name="person_key" value="{{$p.PersonKey}}">{{end}}
+</form>
+
+{{with $d.Person}}
+<p class="pill">作者で絞り込み中: <a href="/artists/detail?key={{.PersonKey}}">{{.DisplayName}}</a>
+  <code>{{.PersonKey}}</code> <a class="muted" href="{{urlWith $d.Query "person_key" ""}}">解除</a></p>
+{{end}}
+
+{{range $res.Notes}}<p class="banner note">{{.}}</p>{{end}}
+
+<p class="summary">
+  {{comma $res.Total}}{{if $res.Capped}}+{{end}} 件
+  <span class="muted">({{dur $res.Elapsed}} / {{$res.Page}} ページ目)</span>
+</p>
+
+{{if $res.Rows}}
+{{if $d.Thumbs}}
+<p class="banner note">サムネイルを表示すると、このページ分 ({{len $res.Rows}} 件) が取得キューに積まれます。
+  館ごと 10 秒に 1 回しか取りに行かないので、埋まるまで数分かかります。</p>
+{{end}}
+
+<div class="tablewrap">
+<table class="grid works">
+  <thead><tr>
+    {{if $d.Thumbs}}<th></th>{{end}}
+    <th>ID</th><th>ソース</th><th>原題</th><th>訳題</th><th>作者</th>
+    <th>年</th><th>館の年テキスト</th><th>style / category</th><th>作者数</th><th></th>
+  </tr></thead>
+  <tbody>
+  {{range $res.Rows}}
+    <tr>
+      {{if $d.Thumbs}}<td class="thumb">
+        {{if .ImageURL}}<img src="/img/{{.ID}}/400" alt="" loading="lazy"
+          data-image-id="{{.ID}}" data-width="400">{{end}}
+      </td>{{end}}
+      <td class="num"><a href="/works/{{.ID}}">{{.ID}}</a></td>
+      <td class="src">{{.Source}}</td>
+      <td class="title">{{orElse "(無題)" (trunc 70 .Title)}}</td>
+      <td class="title ja">{{if .TitleJa}}{{trunc 40 .TitleJa}}{{else}}<span class="null">—</span>{{end}}</td>
+      <td>{{orElse "—" (trunc 40 .Artist)}}</td>
+      <td class="num" title="{{.YearKind}}">
+        {{with .YearLabel}}{{.}}{{else}}<span class="null">—</span>{{end}}
+        {{if eq .YearKind "raw"}}<sup class="muted" title="image_dates 未生成。館の生値">raw</sup>{{end}}
+        {{if .Precision}}<sup class="muted">{{.Precision}}</sup>{{end}}
+      </td>
+      <td class="muted">{{trunc 24 .Date}}</td>
+      <td class="muted">{{trunc 24 .Style}}{{if and .Style .Category}} / {{end}}{{trunc 24 .Category}}</td>
+      <td class="num">
+        {{if ge .ArtistCount 0}}{{.ArtistCount}}{{if gt .ArtistCount 0}}<span class="muted">/{{.PersonCount}}</span>{{end}}{{else}}—{{end}}
+      </td>
+      <td><a class="ext" href="{{.SourceURL}}" target="_blank" rel="noopener">館</a></td>
+    </tr>
+  {{end}}
+  </tbody>
+</table>
+</div>
+
+<nav class="pager">
+  {{if $res.HasPrev}}<a href="{{urlWith $d.Query "page" (printf "%d" (add $res.Page -1))}}">← 前</a>{{end}}
+  <span>{{$res.Page}}</span>
+  {{if $res.HasNext}}<a href="{{urlWith $d.Query "page" (printf "%d" (add $res.Page 1))}}">次 →</a>{{end}}
+</nav>
+{{else}}
+<p class="muted">該当なし。索引が古い可能性がある場合は「LIKE で引く」を試してください。</p>
+{{end}}
+
+<details class="sqlpanel">
+  <summary>実行した SQL</summary>
+  <pre>{{$res.SQL}}</pre>
+  <p class="muted">バインド変数 — {{argPairs $res.Args}}</p>
+</details>
+{{end}}

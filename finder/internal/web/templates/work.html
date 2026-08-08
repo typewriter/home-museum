@@ -1,0 +1,68 @@
+{{define "content"}}
+{{$d := .Data}}
+<h1 class="worktitle">
+  {{if $d.TitleJa}}{{$d.TitleJa}}<span class="orig">{{orElse "(無題)" $d.Title}}</span>
+  {{else}}{{orElse "(無題)" $d.Title}}{{end}}
+</h1>
+
+<p class="meta">
+  <code>images.id = {{$d.ID}}</code>
+  <span class="src">{{$d.Source}}</span>
+  <a class="ext" href="{{$d.SourceURL}}" target="_blank" rel="noopener">館のページ</a>
+  {{if $d.ImageURL}}<a class="ext" href="{{$d.ImageURL}}" target="_blank" rel="noopener">画像 URL</a>{{end}}
+</p>
+
+{{if and $.Images $d.ImageURL}}
+<section class="preview">
+  <img src="/img/{{$d.ID}}/1600" alt="{{orElse "(無題)" $d.Title}}"
+       data-image-id="{{$d.ID}}" data-width="1600" loading="lazy">
+  <p class="muted imgnote" data-for="{{$d.ID}}">
+    館の原本を取得してリサイズ・WebP 化したものです。未取得の場合は順番待ちの絵が出ます。
+  </p>
+</section>
+{{end}}
+
+<section>
+  <h2>images <span class="muted">生の層 — loader.rb だけが書く</span></h2>
+  {{template "table" $d.Image}}
+</section>
+
+<section>
+  <h2>image_artists <span class="muted">生の列 + role_bucket / person_key (派生)</span></h2>
+  {{template "table" $d.Artists}}
+  {{if $d.People}}
+  <p class="people">名寄せ先:
+    {{range $d.People}}<a class="pill" href="/artists/detail?key={{.PersonKey}}">{{.DisplayName}}
+      <code>{{.PersonKey}}</code></a>{{end}}
+  </p>
+  {{end}}
+</section>
+
+<section>
+  <h2>image_dates <span class="muted">派生 — normalize_dates.rb</span></h2>
+  {{if $d.Dates.Empty}}
+    <p class="muted">行なし。<code>ruby normalize_dates.rb</code> がまだこの作品を処理していません。</p>
+  {{else}}{{template "table" $d.Dates}}{{end}}
+</section>
+
+<section>
+  <h2>image_translations <span class="muted">派生 — apply_translations.rb titles</span></h2>
+  {{if $d.Translations.Empty}}
+    <p class="muted">行なし。<code>ruby apply_translations.rb titles</code> がまだ当たっていません。</p>
+  {{else}}{{template "table" $d.Translations}}{{end}}
+</section>
+
+<section>
+  <h2>image_artist_names <span class="muted">派生 — apply_translations.rb seed / artists</span></h2>
+  {{if $d.ArtistNames.Empty}}
+    <p class="muted">行なし。</p>
+  {{else}}{{template "table" $d.ArtistNames}}{{end}}
+</section>
+
+{{if $d.Meta}}
+<section>
+  <h2>ix.image_meta <span class="muted">finder の索引が持つ解決済みの値</span></h2>
+  {{template "table" $d.Meta}}
+</section>
+{{end}}
+{{end}}

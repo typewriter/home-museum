@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{.Title}} — finder</title>
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="/">finder</a>
+  <nav>
+    <a href="/" class="{{if eq .Nav "search"}}on{{end}}">作品</a>
+    <a href="/artists/" class="{{if eq .Nav "artists"}}on{{end}}">作者</a>
+    <a href="/stats" class="{{if eq .Nav "stats"}}on{{end}}">カバレッジ</a>
+    {{if .AllowSQL}}<a href="/sql" class="{{if eq .Nav "sql"}}on{{end}}">SQL</a>{{end}}
+  </nav>
+  <span class="spacer"></span>
+  <span class="dbinfo" title="hm.db は読み取り専用で開いています">
+    {{comma .Index.CurrentImages}} 件
+  </span>
+</header>
+
+{{if not .Index.Present}}
+<div class="banner warn">
+  index.db がありません。<code>go run . index</code> を実行すると全文検索・正規化済みの制作年・絞り込みの選択肢が使えるようになります。
+  いまは LIKE 検索にフォールバックしています。
+</div>
+{{else if .Index.Stale}}
+<div class="banner warn">
+  索引が古くなっています
+  (索引作成時 {{comma .Index.IndexedImages}} 件 / 現在 {{comma .Index.CurrentImages}} 件、
+  最終更新 {{orElse "—" .Index.BuiltMaxUpd}} → {{orElse "—" .Index.CurrentMaxUpd}})。
+  <code>go run . index</code> で作り直してください。
+</div>
+{{end}}
+
+<main>
+{{template "content" .}}
+</main>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
+
+{{/* 汎用の結果表。hm.db の生の行をそのまま出す用。NULL と空文字を区別する。 */}}
+{{define "table"}}
+  {{if .Empty}}
+    <p class="muted">(行なし)</p>
+  {{else}}
+    <div class="tablewrap">
+      <table class="grid">
+        <thead><tr>{{range .Cols}}<th>{{.}}</th>{{end}}</tr></thead>
+        <tbody>
+          {{range .Rows}}<tr>
+            {{range .}}<td>
+              {{- if .Null}}<span class="null">NULL</span>
+              {{- else if eq .Text ""}}<span class="empty">(空)</span>
+              {{- else}}{{.Text}}{{end -}}
+            </td>{{end}}
+          </tr>{{end}}
+        </tbody>
+      </table>
+    </div>
+    {{if .Truncated}}<p class="muted">※ 表示を打ち切りました</p>{{end}}
+  {{end}}
+{{end}}
