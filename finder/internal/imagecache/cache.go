@@ -319,8 +319,16 @@ func (c *Cache) download(ctx context.Context, e Entry, dst string) error {
 	case resp.StatusCode == http.StatusNotFound, resp.StatusCode == http.StatusGone:
 		return permanent("館が %d を返しました", resp.StatusCode)
 	case resp.StatusCode == http.StatusForbidden, resp.StatusCode == http.StatusUnauthorized:
-		// 403 は UA / Referer の問題であることが多い。恒久扱いにすると
-		// origin.go を直しても復帰できないので一時失敗にしておく。
+		// Cloudflare の Managed Challenge (cf-mitigated: challenge) は
+		// ヘッダーで回避できる問題ではなく (実測: UA/Referer/cf_clearance
+		// いずれを足しても通らない)、リトライしても無駄なので恒久扱いにする。
+		// AIC は 2025-12 頃に www.artic.edu 全体へこれを導入し、以降ずっと
+		// このまま (github art-institute-of-chicago/data-aggregator#151)。
+		// それ以外の 403 は UA / Referer の問題であることが多いので、恒久扱い
+		// にすると origin.go を直しても復帰できなくなる。一時失敗のままにする。
+		if resp.Header.Get("Cf-Mitigated") != "" {
+			return permanent("Cloudflare のチャレンジで拒否されました (cf-mitigated: %s)", resp.Header.Get("Cf-Mitigated"))
+		}
 		return fmt.Errorf("館が %d を返しました (UA / Referer を確認)", resp.StatusCode)
 	case resp.StatusCode != http.StatusOK:
 		return fmt.Errorf("館が %d を返しました", resp.StatusCode)

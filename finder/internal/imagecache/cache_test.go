@@ -70,6 +70,11 @@ func TestFetchStates(t *testing.T) {
 			io.WriteString(w, "<html>エラーページ</html>")
 		case "/boom.jpg":
 			http.Error(w, "oops", http.StatusInternalServerError)
+		case "/challenge.jpg":
+			w.Header().Set("Cf-Mitigated", "challenge")
+			http.Error(w, "just a moment", http.StatusForbidden)
+		case "/forbidden.jpg":
+			http.Error(w, "no ua", http.StatusForbidden)
 		}
 	}))
 	defer srv.Close()
@@ -84,6 +89,8 @@ func TestFetchStates(t *testing.T) {
 		{"404 は gone (二度と取りに行かない)", "/missing.jpg", StateGone},
 		{"画像でなければ gone", "/page.html", StateGone},
 		{"5xx は failed (再試行する)", "/boom.jpg", StateFailed},
+		{"cf-mitigated 付き 403 は gone (チャレンジは解けない)", "/challenge.jpg", StateGone},
+		{"cf-mitigated なし 403 は failed (UA/Referer で直るかもしれない)", "/forbidden.jpg", StateFailed},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
