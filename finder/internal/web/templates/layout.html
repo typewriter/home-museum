@@ -4,16 +4,17 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{{.Title}} — finder</title>
-<link rel="stylesheet" href="/static/app.css">
+<link rel="stylesheet" href="{{u "/static/app.css"}}">
 </head>
 <body>
 <header class="topbar">
-  <a class="brand" href="/">finder</a>
+  <a class="brand" href="{{u "/"}}">finder</a>
   <nav>
-    <a href="/" class="{{if eq .Nav "search"}}on{{end}}">作品</a>
-    <a href="/artists/" class="{{if eq .Nav "artists"}}on{{end}}">作者</a>
-    <a href="/stats" class="{{if eq .Nav "stats"}}on{{end}}">カバレッジ</a>
-    {{if .AllowSQL}}<a href="/sql" class="{{if eq .Nav "sql"}}on{{end}}">SQL</a>{{end}}
+    <a href="{{u "/"}}" class="{{if eq .Nav "search"}}on{{end}}">作品</a>
+    <a href="{{u "/artists/"}}" class="{{if eq .Nav "artists"}}on{{end}}">作者</a>
+    {{if .HasCollections}}<a href="{{u "/collections/"}}" class="{{if eq .Nav "collections"}}on{{end}}">コレクション</a>{{end}}
+    <a href="{{u "/stats"}}" class="{{if eq .Nav "stats"}}on{{end}}">カバレッジ</a>
+    {{if .AllowSQL}}<a href="{{u "/sql"}}" class="{{if eq .Nav "sql"}}on{{end}}">SQL</a>{{end}}
   </nav>
   <span class="spacer"></span>
   <span class="dbinfo" title="hm.db は読み取り専用で開いています">
@@ -39,9 +40,25 @@
 {{template "content" .}}
 </main>
 
-<script src="/static/app.js"></script>
+<script>window.__BASE__ = "{{u ""}}";</script>
+<script src="{{u "/static/app.js"}}"></script>
 </body>
 </html>
+
+{{/* コレクションへ 1 枚追加するボタン。dict "URL" source_url "Back" 戻り先 で呼ぶ。
+     追加先が 1 本も無いときは何も出さない (作れという案内は一覧ページに任せる)。 */}}
+{{define "addto"}}
+  {{if .Cols}}
+  <form method="post" action="{{u "/collections/add"}}" class="inline addto">
+    <input type="hidden" name="url" value="{{.URL}}">
+    <input type="hidden" name="back" value="{{.Back}}">
+    <select name="collection_id" aria-label="追加先のコレクション">
+      {{range .Cols}}<option value="{{.ID}}">{{.Title}}</option>{{end}}
+    </select>
+    <button title="このコレクションに追加">＋</button>
+  </form>
+  {{end}}
+{{end}}
 
 {{/* 汎用の結果表。hm.db の生の行をそのまま出す用。NULL と空文字を区別する。 */}}
 {{define "table"}}

@@ -13,13 +13,19 @@
 cd finder
 go run . index          # 索引 (index.db) を作る。約 1 分 / 約 270 MB
 go run . serve          # http://127.0.0.1:8081
+
+go run . collections export   # コレクションを git 用のテキストに書き出す
+go run . collections import   # 書き戻す (collections.db を作り直す)
 ```
 
 | フラグ | 既定 | 環境変数 |
 |---|---|---|
 | `-db` | `../importer/hm.db` | `DATABASE_PATH` |
 | `-index` | `./index.db` | `FINDER_INDEX` |
+| `-collections` | `./collections.db` (空にすると機能ごと無効) | `FINDER_COLLECTIONS` |
+| `-collections-dir` | `./collections` (export / import の対象) | `FINDER_COLLECTIONS_DIR` |
 | `-addr` | `127.0.0.1:8081` | `FINDER_ADDR` |
+| `-base-path` | 空 (ルート直下)。例: `/art-finder` | `FINDER_BASE_PATH` |
 | `-sql` | `true` (読み取り専用 SQL コンソール) | — |
 | `-timeout` | `30s` | — |
 | `-images` | 空 (無効)。`r2` / `local:<dir>` | `FINDER_IMAGE_STORE` |
@@ -40,14 +46,26 @@ go run . serve          # http://127.0.0.1:8081
 古くなるのは検索のヒット範囲と絞り込みの選択肢だけで、それは画面上部の警告で分かる。
 
 ```
-importer/hm.db  ──(mode=ro / ATTACH)──┐
-                                      ├── finder serve
-finder/index.db ──(mode=ro / ATTACH)──┘
+importer/hm.db        ──(mode=ro / ATTACH)──┐
+                                            │
+finder/index.db       ──(mode=ro / ATTACH)──┼── finder serve
+      ↑                                     │
+   finder index                             │
+   (いつ捨ててもよい)                        │
+                                            │
+finder/collections.db ──(読み書き / ATTACH)──┘
       ↑
-   finder index   (hm.db を読んで作り直す。いつ捨ててもよい)
+   人の操作 (これだけ作り直せない)
 ```
 
-`index.db` は `.gitignore` 済み。
+**ATTACH 先はメイン接続の読み取り専用フラグを継承しない。** 読ませたいだけの
+DB には DSN に `mode=ro` を明示すること。コレクションが同じ接続で書けるのは
+この性質のおかげで、逆に言えば `mode=ro` を書き忘れた ATTACH は書けてしまう
+(`spec_collections.md` §2 に実測)。
+
+`index.db` と `collections.db` はどちらも `.gitignore` 済み。ただし
+**`collections.db` だけは復旧できない**ので、`go run . collections export` で
+`collections/` 以下のテキストに出して git に置く。
 
 ### index.db の中身
 
@@ -85,8 +103,47 @@ FTS5 の式を直接書きたいときは「FTS5 の式をそのまま渡す」�
 | `/artists/` | 名寄せ結果 (`artists`)。`person_key` の種別 (ulan / wd / cluster) で絞れる |
 | `/artists/detail?key=` | 寄せられた生表記の内訳 (`name_raw` × 判定手法 × 件数) とソース別作品数 |
 | `/artists/unmatched` | `person_key IS NULL` の作者表記を件数の多い順に。名寄せの取りこぼしを潰す用 |
+| `/collections/` | コレクションの一覧と新規作成 |
+| `/collections/{slug}` | メンバー一覧。並べ替え・覚書・外す |
 | `/stats` | 派生層のカバレッジ (ソース × テーブル)、`date_precision` / `role_bucket` / 世紀別の分布、索引の状態。10 分キャッシュ (`?refresh=1` で再集計) |
 | `/sql` | 読み取り専用 SQL コンソール。`ix.` も参照できる。500 行で打ち切り |
+
+## コレクション
+
+「浮世絵」「フレスコの宗教画」のような主題別の作品集。設計は
+[`spec_collections.md`](spec_collections.md)。
+
+データは **1 コレクションが複数の作品を持つ**だけで、テーブルは 2 枚しかない。
+**検索条件は保存しない** — 検索は作品を集める作業の道具であって、コレクションの
+定義ではない。追加した時点の作品が行として残るので、あとから `hm.db` が変わっても
+メンバーは勝手に増減しない。
+
+集め方は 3 つ:
+
+- 作品検索で絞り込んで**「この検索結果をまとめて追加」** (上限 10,000 件)
+- 検索結果の行ごとの「＋」
+- 作品ページ (`/works/{id}`) と作者ページから
+
+メンバーのキーは `images.id` ではなく **`source_url`**。`hm.db` を作り直すと `id`
+は変わるが、コレクションには派生層のような「作り直せばよい」逃げ道がないため
+(§3)。副作用として **`hm.db` にまだ無い作品も指せる** ので、館の URL を控えて
+おいてクロール後に合流させられる。解決できないメンバーは「未解決」として件数が出る。
+
+### git に出す
+
+`collections.db` は壊れたら復旧できない唯一のファイルなので、テキストに出して
+git に置く (§6)。
+
+```bash
+go run . collections export   # → collections/collections.yaml + <slug>.csv
+go run . collections import   # ← YAML を正本として collections.db を作り直す
+```
+
+- `collections.yaml` — コレクションのメタ情報。全部で 1 ファイル
+- `collections/<slug>.csv` — `source_url, position, note`。
+  `importer/titles_ja_*.csv` と同じ扱いで、行単位の diff が読める
+
+保存のたびに自動では書き出さない (git の作業ツリーが常に汚れるため)。
 
 ## 画像キャッシュ
 
@@ -121,6 +178,33 @@ WebP にし (1600px と 400px)、無期限で保管する。
 10 秒では埋まるのに数分かかるため。必要なときだけ「サムネイルを出す」を有効にする。
 
 進捗は `/stats` の「画像キャッシュ」節で見られる。
+
+## VPS へのデプロイ (HTTPS)
+
+HTTPS の受け口 (Caddy) は複数サービス共通で `../caddy-host` にある。finder
+専用ではないので、まずそちらを一度だけ起動してから finder を上乗せする。
+
+```bash
+# 1. 受け口 (初回だけ、以後は他サービスを足しても再起動不要)
+cd ../caddy-host
+echo 'DOMAIN=finder.example.com' > .env
+docker compose up -d --build
+
+# 2. finder (R2_* は finder/.env に書いておく)
+cd ../finder
+docker compose -f docker-compose.yml -f compose.https.yml up -d --build
+```
+
+`compose.https.yml` は `docker-compose.yml` への上乗せで、finder を
+caddy-host が作る外部ネットワーク `homemuseum` に参加させ、`FINDER_BASE_PATH`
+(既定 `/art-finder`) を教えるだけ。証明書の取得・更新やパスベースのルーティング
+定義は `../caddy-host/Caddyfile` 側にある。ルート `/` は finder 以外の将来の
+アプリのために空けてある。
+
+finder はテンプレート・リダイレクトの絶対パスすべてに `-base-path` /
+`FINDER_BASE_PATH` を前置してから出す (`internal/web/server.go` の `u()`)。パス
+以外のところ (ホストベースルーティングなど) で公開する場合は
+`FINDER_BASE_PATH` を空のままにしてよい。
 
 ### 実測値
 

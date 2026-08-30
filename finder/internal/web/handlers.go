@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -14,27 +15,7 @@ import (
 )
 
 func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
-	p := store.SearchParams{
-		Q:          q(r, "q"),
-		Raw:        qBool(r, "raw"),
-		Like:       qBool(r, "like"),
-		Sources:    qList(r, "source"),
-		Style:      q(r, "style"),
-		Category:   q(r, "category"),
-		Medium:     q(r, "medium"),
-		Origin:     q(r, "origin"),
-		Artist:     q(r, "artist"),
-		PersonKey:  q(r, "person_key"),
-		YearFrom:   qIntPtr(r, "year_from"),
-		YearTo:     qIntPtr(r, "year_to"),
-		YearKind:   q(r, "year_kind"),
-		Precision:  qList(r, "precision"),
-		HasJa:      q(r, "has_ja"),
-		ArtistCond: q(r, "artist_cond"),
-		Sort:       q(r, "sort"),
-		Page:       qInt(r, "page", 1),
-		Per:        qInt(r, "per", 50),
-	}
+	p := searchParams(r)
 
 	ctx, cancel := context.WithTimeout(r.Context(), s.queryWait)
 	defer cancel()
@@ -59,6 +40,10 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 		"Facets": s.facets(ctx),
 		"Query":  r.URL.Query(),
 		"Person": person,
+		"Flash":  q(r, "flash"),
+		// 「まとめて追加」に今の条件をそのまま渡すためのフォーム値。
+		"Hidden":  hiddenPairs(r.URL.Query()),
+		"BackURL": s.u(r.URL.RequestURI()),
 		// 一覧のサムネは既定で出さない。1 ページ 50 件を一度に要求すると
 		// 館ごと 10 秒では埋まるのに数分かかる (spec_image_cache.md §8)。
 		"Thumbs": s.cache != nil && qBool(r, "thumbs"),
@@ -87,7 +72,13 @@ func (s *Server) handleWork(w http.ResponseWriter, r *http.Request) {
 	if d.TitleJa != "" {
 		title = d.TitleJa
 	}
-	s.render(w, r, "work.html", title, "search", d)
+	in, err := s.st.CollectionsForURL(ctx, d.SourceURL)
+	if err != nil {
+		log.Printf("所属コレクションを読めませんでした: %v", err)
+	}
+	s.render(w, r, "work.html", title, "search", map[string]any{
+		"W": d, "In": in, "Flash": q(r, "flash"),
+	})
 }
 
 func (s *Server) handleArtists(w http.ResponseWriter, r *http.Request) {
@@ -115,7 +106,7 @@ func (s *Server) handleArtists(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleArtist(w http.ResponseWriter, r *http.Request) {
 	key := q(r, "key")
 	if key == "" {
-		http.Redirect(w, r, "/artists/", http.StatusSeeOther)
+		http.Redirect(w, r, s.u("/artists/"), http.StatusSeeOther)
 		return
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), s.queryWait)
@@ -203,6 +194,23 @@ func (s *Server) stats(ctx context.Context, refresh bool) (*store.Stats, time.Ti
 	}
 	s.statsVal, s.statsAt = st, time.Now()
 	return st, s.statsAt, nil
+}
+
+// hiddenPairs は検索条件を <input type=hidden> に展開するための組。
+// 「この検索結果をまとめて追加」は POST なので、条件を本文に載せ直す必要がある。
+// flash と page は持ち越さない (page を渡すとそのページぶんしか入らない)。
+func hiddenPairs(v url.Values) []struct{ Key, Value string } {
+	var out []struct{ Key, Value string }
+	for k, vs := range v {
+		if k == "flash" || k == "page" || k == "thumbs" {
+			continue
+		}
+		for _, s := range vs {
+			out = append(out, struct{ Key, Value string }{k, s})
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Key < out[j].Key })
+	return out
 }
 
 // urlWith は現在のクエリ文字列を土台に、指定したキーだけ差し替えた URL を返す。

@@ -56,7 +56,8 @@
       var next = [];
       var checks = pending.map(function (img) {
         var id = img.dataset.imageId;
-        return fetch('/img/' + id + '/' + img.dataset.width + '/status', {
+        var base = window.__BASE__ || '';
+        return fetch(base + '/img/' + id + '/' + img.dataset.width + '/status', {
           headers: { 'Accept': 'application/json' }
         }).then(function (r) { return r.json(); }).then(function (st) {
           var note = document.querySelector('.imgnote[data-for="' + id + '"]');

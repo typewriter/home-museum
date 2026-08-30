@@ -1,0 +1,134 @@
+{{define "content"}}
+{{$d := .Data}}{{$c := $d.C}}{{$res := $d.Res}}{{$thumbs := $d.Thumbs}}
+{{$back := u (printf "/collections/%s?page=%d" $c.Slug $res.Page)}}
+
+<h1>{{$c.Title}}
+  {{if $c.TitleEn}}<span class="muted">{{$c.TitleEn}}</span>{{end}}
+</h1>
+
+<p class="meta">
+  <code>{{$c.Slug}}</code>
+  {{comma $res.Total}} 件
+  {{if $res.Unresolved}}<span class="null" title="hm.db に無い source_url">未解決 {{comma $res.Unresolved}} 件</span>{{end}}
+  <span class="muted">並び: {{$c.SortLabel}}</span>
+  <a href="{{u "/collections/"}}">← 一覧</a>
+</p>
+
+{{with $c.Description}}<p class="hint">{{.}}</p>{{end}}
+{{with $d.Flash}}<p class="banner note">{{.}}</p>{{end}}
+
+{{if $res.Rows}}
+<div class="tablewrap">
+<table class="grid works">
+  <thead><tr>
+    {{if $thumbs}}<th></th>{{end}}
+    {{if eq $c.Sort "manual"}}<th class="num">順</th>{{end}}
+    <th>作品</th><th>作者</th><th>年</th><th>覚書</th><th></th>
+  </tr></thead>
+  <tbody>
+  {{range $res.Rows}}
+    <tr>
+      {{if $thumbs}}<td class="thumb">
+        {{with .Work}}{{if .ImageURL}}<img src="{{u "/img"}}/{{.ID}}/400" alt="" loading="lazy"
+          data-image-id="{{.ID}}" data-width="400">{{end}}{{end}}
+      </td>{{end}}
+
+      {{if eq $c.Sort "manual"}}
+      <td class="num order">
+        {{if .Position.Valid}}{{.Position.Int64}}{{else}}<span class="null">—</span>{{end}}
+        <form method="post" action="{{u "/collections/move"}}" class="inline">
+          <input type="hidden" name="collection_id" value="{{$c.ID}}">
+          <input type="hidden" name="url" value="{{.SourceURL}}">
+          <input type="hidden" name="back" value="{{$back}}">
+          <button name="dir" value="up" title="上へ">↑</button>
+          <button name="dir" value="down" title="下へ">↓</button>
+        </form>
+      </td>
+      {{end}}
+
+      <td class="title">
+        {{with .Work}}
+          <a href="{{u "/works"}}/{{.ID}}">{{orElse "(無題)" (trunc 70 .Title)}}</a>
+          {{if .TitleJa}}<div class="ja">{{trunc 40 .TitleJa}}</div>{{end}}
+          <div class="hint"><span class="src">{{.Source}}</span>
+            <a class="ext" href="{{.SourceURL}}" target="_blank" rel="noopener">館</a></div>
+        {{else}}
+          <span class="null">hm.db に無い</span>
+          <div class="hint"><a class="ext" href="{{.SourceURL}}" target="_blank" rel="noopener">{{trunc 70 .SourceURL}}</a></div>
+        {{end}}
+      </td>
+
+      <td>{{with .Work}}{{orElse "—" (trunc 40 .Artist)}}{{else}}—{{end}}</td>
+      <td class="num">{{with .Work}}{{with .YearLabel}}{{.}}{{else}}<span class="null">—</span>{{end}}{{else}}—{{end}}</td>
+
+      <td class="note">
+        <form method="post" action="{{u "/collections/note"}}" class="inline">
+          <input type="hidden" name="collection_id" value="{{$c.ID}}">
+          <input type="hidden" name="url" value="{{.SourceURL}}">
+          <input type="hidden" name="back" value="{{$back}}">
+          <input name="note" value="{{.Note}}" placeholder="なぜ入れたか" size="16">
+        </form>
+      </td>
+
+      <td>
+        <form method="post" action="{{u "/collections/remove"}}" class="inline">
+          <input type="hidden" name="collection_id" value="{{$c.ID}}">
+          <input type="hidden" name="url" value="{{.SourceURL}}">
+          <input type="hidden" name="back" value="{{$back}}">
+          <button class="danger" title="このコレクションから外す">外す</button>
+        </form>
+      </td>
+    </tr>
+  {{end}}
+  </tbody>
+</table>
+</div>
+
+<nav class="pager">
+  {{if $res.HasPrev}}<a href="{{urlWith $d.Query "page" (printf "%d" (add $res.Page -1))}}">← 前</a>{{end}}
+  <span>{{$res.Page}}</span>
+  {{if $res.HasNext}}<a href="{{urlWith $d.Query "page" (printf "%d" (add $res.Page 1))}}">次 →</a>{{end}}
+  {{if $.Images}}
+    {{if $thumbs}}<a class="muted" href="{{urlWith $d.Query "nothumbs" "1"}}">サムネイルを消す</a>
+    {{else}}<a class="muted" href="{{urlWith $d.Query "nothumbs" ""}}">サムネイルを出す</a>{{end}}
+  {{end}}
+</nav>
+{{else}}
+<p class="muted">まだ空です。<a href="{{u "/"}}">作品検索</a>で絞り込んでから
+  「この検索結果をまとめて追加」するか、作品ページから 1 枚ずつ足してください。</p>
+{{end}}
+
+<section>
+  <h2>設定</h2>
+  <form class="filters" method="post" action="{{u "/collections/save"}}">
+    <input type="hidden" name="id" value="{{$c.ID}}">
+    <div class="row main">
+      <input name="title" value="{{$c.Title}}" required>
+      <input name="title_en" value="{{$c.TitleEn}}" placeholder="英語題" size="20">
+      <input name="slug" value="{{$c.Slug}}" size="16" pattern="[a-z0-9][a-z0-9-]*">
+      <label>並び
+        <select name="sort">
+          {{range $d.Sorts}}<option value="{{.Value}}" {{if eq $c.Sort .Value}}selected{{end}}>{{.Label}}</option>{{end}}
+        </select>
+      </label>
+      <button type="submit">保存</button>
+    </div>
+    <div class="row">
+      <input name="description" value="{{$c.Description}}" placeholder="説明" style="flex:1">
+      <input name="cover_url" value="{{$c.CoverURL}}" placeholder="代表画像の source_url" style="flex:1">
+    </div>
+  </form>
+</section>
+
+<section>
+  <h2>削除</h2>
+  <form class="filters" method="post" action="{{u "/collections/delete"}}">
+    <input type="hidden" name="id" value="{{$c.ID}}">
+    <div class="row main">
+      <input name="confirm" placeholder="題名をそのまま入力" size="24" required>
+      <button class="danger" type="submit">このコレクションを削除</button>
+      <span class="hint">エクスポート済みの CSV 以外に復旧手段はありません。</span>
+    </div>
+  </form>
+</section>
+{{end}}

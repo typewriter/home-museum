@@ -2,5 +2,5 @@
 {{$d := .Data}}
 <h1>エラー <span class="muted">{{$d.Code}}</span></h1>
 <pre class="banner warn">{{$d.Message}}</pre>
-<p><a href="/">検索に戻る</a></p>
+<p><a href="{{u "/"}}">検索に戻る</a></p>
 {{end}}

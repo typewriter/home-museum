@@ -1,11 +1,11 @@
 {{define "content"}}
 {{$d := .Data}}{{$p := $d.P}}{{$res := $d.Res}}{{$f := $d.Facets}}
-<form class="filters" method="get" action="/">
+<form class="filters" method="get" action="{{u "/"}}">
   <div class="row main">
     <input type="search" name="q" id="q" value="{{$p.Q}}" placeholder="キーワード (原題・訳題・作者・説明文・技法など)" autofocus>
     <input type="search" name="artist" value="{{$p.Artist}}" placeholder="作者名" size="20">
     <button type="submit">検索</button>
-    <a class="btn ghost" href="/">条件をクリア</a>
+    <a class="btn ghost" href="{{u "/"}}">条件をクリア</a>
   </div>
 
   <details class="advanced" {{if or $p.Style $p.Category $p.Medium $p.Origin $p.YearFrom $p.YearTo $p.Sources $p.Precision $p.HasJa $p.ArtistCond}}open{{end}}>
@@ -100,15 +100,34 @@
 </form>
 
 {{with $d.Person}}
-<p class="pill">作者で絞り込み中: <a href="/artists/detail?key={{.PersonKey}}">{{.DisplayName}}</a>
+<p class="pill">作者で絞り込み中: <a href="{{u "/artists/detail"}}?key={{.PersonKey}}">{{.DisplayName}}</a>
   <code>{{.PersonKey}}</code> <a class="muted" href="{{urlWith $d.Query "person_key" ""}}">解除</a></p>
 {{end}}
 
 {{range $res.Notes}}<p class="banner note">{{.}}</p>{{end}}
+{{with $d.Flash}}<p class="banner note">{{.}}</p>{{end}}
 
 <p class="summary">
   {{comma $res.Total}}{{if $res.Capped}}+{{end}} 件
   <span class="muted">({{dur $res.Elapsed}} / {{$res.Page}} ページ目)</span>
+
+  {{if and $.HasCollections $res.Rows}}
+  <span class="bulk">
+    <form method="post" action="{{u "/collections/add"}}" class="inline">
+      {{range $d.Hidden}}<input type="hidden" name="{{.Key}}" value="{{.Value}}">{{end}}
+      <input type="hidden" name="from_search" value="1">
+      {{if $.Collections}}
+        <select name="collection_id" aria-label="追加先のコレクション">
+          {{range $.Collections}}<option value="{{.ID}}">{{.Title}}</option>{{end}}
+        </select>
+        <button type="submit">この検索結果 {{comma $res.Total}}{{if $res.Capped}}+{{end}} 件をまとめて追加</button>
+      {{else}}
+        <a class="btn ghost" href="{{u "/collections/"}}">まずコレクションを作る</a>
+      {{end}}
+    </form>
+    <span class="hint">条件は保存しません。いま出ている作品が行として入ります{{if $res.Capped}} (上限 {{comma 10000}} 件){{end}}。</span>
+  </span>
+  {{end}}
 </p>
 
 {{if $res.Rows}}
@@ -123,15 +142,16 @@
     {{if $d.Thumbs}}<th></th>{{end}}
     <th>ID</th><th>ソース</th><th>原題</th><th>訳題</th><th>作者</th>
     <th>年</th><th>館の年テキスト</th><th>style / category</th><th>作者数</th><th></th>
+    {{if $.HasCollections}}<th></th>{{end}}
   </tr></thead>
   <tbody>
   {{range $res.Rows}}
     <tr>
       {{if $d.Thumbs}}<td class="thumb">
-        {{if .ImageURL}}<img src="/img/{{.ID}}/400" alt="" loading="lazy"
+        {{if .ImageURL}}<img src="{{u "/img"}}/{{.ID}}/400" alt="" loading="lazy"
           data-image-id="{{.ID}}" data-width="400">{{end}}
       </td>{{end}}
-      <td class="num"><a href="/works/{{.ID}}">{{.ID}}</a></td>
+      <td class="num"><a href="{{u "/works"}}/{{.ID}}">{{.ID}}</a></td>
       <td class="src">{{.Source}}</td>
       <td class="title">{{orElse "(無題)" (trunc 70 .Title)}}</td>
       <td class="title ja">{{if .TitleJa}}{{trunc 40 .TitleJa}}{{else}}<span class="null">—</span>{{end}}</td>
@@ -147,6 +167,9 @@
         {{if ge .ArtistCount 0}}{{.ArtistCount}}{{if gt .ArtistCount 0}}<span class="muted">/{{.PersonCount}}</span>{{end}}{{else}}—{{end}}
       </td>
       <td><a class="ext" href="{{.SourceURL}}" target="_blank" rel="noopener">館</a></td>
+      {{if $.HasCollections}}
+      <td>{{template "addto" dict "Cols" $.Collections "URL" .SourceURL "Back" $d.BackURL}}</td>
+      {{end}}
     </tr>
   {{end}}
   </tbody>

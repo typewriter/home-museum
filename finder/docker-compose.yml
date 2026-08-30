@@ -1,0 +1,53 @@
+# finder 単体を立ち上げる。リポジトリルートの docker-compose.yml (server/viewer =
+# 旧実装) とは無関係で、共有するものは何も無い。
+#
+#   cd finder && docker compose up --build   → http://127.0.0.1:8081
+#
+# hm.db と index.db はイメージに入れず volume で渡す。どちらも journal_mode=delete
+# なので -wal / -shm は無く、ファイル単体の bind mount で安全に読める。
+
+services:
+  finder:
+    build:
+      context: .
+    # bind mount した cache/ に書けるよう、ホスト側の所有者に合わせる。
+    # 違う UID で動かすなら .env に UID / GID を書く。
+    user: "${UID:-1000}:${GID:-1000}"
+    ports:
+      # 公開はリバースプロキシ (nginx / Caddy) 越しにする前提で localhost に絞る。
+      - "127.0.0.1:8081:8080"
+    environment:
+      # R2 は未接続。openR2 は値が空でなければ通り、minio.New はネットワークを
+      # 触らないので起動と閲覧はできる。画像は取得しようとした時点で
+      # DUMMY.r2.cloudflarestorage.com の名前解決に失敗する。
+      R2_ACCOUNT_ID: ${R2_ACCOUNT_ID:?}
+      R2_BUCKET: ${R2_BUCKET:?}
+      R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID:?}
+      R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY:?}
+    volumes:
+      # どちらも :ro。finder は hm.db を mode=ro で開き、index.db も DSN に
+      # mode=ro を書いて ATTACH する。
+      #
+      # ATTACH 先はメイン接続の読み取り専用フラグを*継承しない*ので、
+      # mode=ro を書き忘れた ATTACH は書けてしまう (spec_collections.md §2)。
+      # ここで :ro を付けているのはその二重の歯止め。
+      #
+      # 索引を作り直すときはホスト側で `go run . index` を実行する。コンテナ内で
+      # やりたい場合は index.db を*ディレクトリごと*渡して :ro を外すこと
+      # (index コマンドは index.db.building* を同じディレクトリに作る)。
+      - ../importer/hm.db:/data/hm.db:ro
+      - ./index.db:/data/index.db:ro
+      # cache.db だけが書き込み先。消すと gone のネガティブキャッシュまで消えて、
+      # 取れない画像で館を叩き直すことになる (spec_image_cache.md)。
+      #
+      # cache.db は WAL なので、ファイル単体ではなくディレクトリごと渡す。
+      # ファイル単体だと -wal / -shm がコンテナ側に取り残され、チェックポイント
+      # 前の書き込みがコンテナの破棄と一緒に消える。
+      # 置き場所を変えるなら .env に FINDER_CACHE_DIR を書く。
+      #
+      # collections.db も同じディレクトリに置く (同じく WAL、同じく書き込み先)。
+      # ただし性格は正反対で、cache.db は消しても館から取り直せるが
+      # collections.db は人の手でしか作れない。バックアップは
+      # `finder collections export` で git に置くこと (spec_collections.md §6)。
+      - ${FINDER_CACHE_DIR:-./cache}:/var/lib/finder
+    restart: unless-stopped

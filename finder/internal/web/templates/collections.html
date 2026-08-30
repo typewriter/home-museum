@@ -1,0 +1,63 @@
+{{define "content"}}
+{{$d := .Data}}
+<h1>コレクション <span class="muted">collections.db — finder が唯一の書き手</span></h1>
+
+{{with $d.Flash}}<p class="banner note">{{.}}</p>{{end}}
+
+<p class="hint">
+  作品の集め方は「検索して選ぶ」だけ。検索条件は保存しないので、追加した時点の
+  作品が行として残る。あとから hm.db が変わってもメンバーは動かない。
+  <strong>このファイルだけは作り直せない</strong>ので、
+  <code>go run . collections export</code> で git に出しておくこと。
+</p>
+
+{{if $d.Cols}}
+<div class="tablewrap">
+<table class="grid">
+  <thead><tr>
+    <th>コレクション</th><th>slug</th><th class="num">件数</th>
+    <th>並び</th><th>更新</th>
+  </tr></thead>
+  <tbody>
+  {{range $d.Cols}}
+    <tr>
+      <td class="title"><a href="{{u "/collections"}}/{{.Slug}}">{{.Title}}</a>
+        {{if .TitleEn}}<span class="muted">{{.TitleEn}}</span>{{end}}
+        {{if .Description}}<div class="hint">{{trunc 90 .Description}}</div>{{end}}
+      </td>
+      <td><code>{{.Slug}}</code></td>
+      <td class="num">{{comma .Count}}
+        {{if .Unresolved}}<sup class="null" title="hm.db に無い source_url。まだクロールしていない作品も指せる">未解決 {{.Unresolved}}</sup>{{end}}
+      </td>
+      <td class="muted">{{.SortLabel}}</td>
+      <td class="muted">{{trunc 10 .UpdatedAt}}</td>
+    </tr>
+  {{end}}
+  </tbody>
+</table>
+</div>
+{{else}}
+<p class="muted">まだ 1 本もありません。</p>
+{{end}}
+
+<section>
+  <h2>新しいコレクション</h2>
+  <form class="filters" method="post" action="{{u "/collections/save"}}">
+    <div class="row main">
+      <input name="title" placeholder="題名 (例: 浮世絵)" required>
+      <input name="title_en" placeholder="英語題 (任意)" size="20">
+      <input name="slug" placeholder="slug (任意。空なら自動)" size="16"
+             pattern="[a-z0-9][a-z0-9-]*" title="半角英小文字・数字・ハイフン">
+      <label>並び
+        <select name="sort">
+          {{range $d.Sorts}}<option value="{{.Value}}">{{.Label}}</option>{{end}}
+        </select>
+      </label>
+      <button type="submit">作る</button>
+    </div>
+    <div class="row">
+      <input name="description" placeholder="説明 (任意)" style="flex:1">
+    </div>
+  </form>
+</section>
+{{end}}

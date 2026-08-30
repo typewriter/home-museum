@@ -178,6 +178,86 @@ func parseQuery(q string) parsedQuery {
 // SearchWorks は作品を検索する。索引が無い場合は LIKE にフォールバックする
 // ので、`finder index` を実行する前でも一通り使える。
 func (s *Store) SearchWorks(ctx context.Context, p SearchParams) (*SearchResult, error) {
+	b := s.searchBuilder(&p)
+
+	cols := append([]string{
+		"i.id", "i.source", "coalesce(i.source_id, '')", "coalesce(i.title, '')",
+		"coalesce(tj.text, '')", "coalesce(i.artist, '')", "coalesce(i.date, '')",
+		"coalesce(i.style, '')", "coalesce(i.category, '')", "coalesce(i.medium, '')",
+		"i.source_url", "coalesce(i.image_url, '')",
+	}, b.sel...)
+
+	body := b.body()
+	query := "SELECT " + strings.Join(cols, ", ") + "\n" + body + "\n" + b.order +
+		fmt.Sprintf("\nLIMIT %d OFFSET %d", p.Per, (p.Page-1)*p.Per)
+
+	start := time.Now()
+	rows, err := s.DB.QueryContext(ctx, query, b.args...)
+	if err != nil {
+		return nil, fmt.Errorf("検索に失敗しました: %w\n\n%s", err, query)
+	}
+	defer rows.Close()
+
+	res := &SearchResult{Page: p.Page, Per: p.Per, SQL: query, Args: b.args, Notes: b.notes}
+	for rows.Next() {
+		var w WorkRow
+		var hasJa int
+		if err := rows.Scan(&w.ID, &w.Source, &w.SourceID, &w.Title, &w.TitleJa, &w.Artist,
+			&w.Date, &w.Style, &w.Category, &w.Medium, &w.SourceURL, &w.ImageURL,
+			&w.YearStart, &w.YearEnd, &w.YearKind, &w.Precision,
+			&hasJa, &w.ArtistCount, &w.CreatorCount, &w.PersonCount); err != nil {
+			return nil, err
+		}
+		w.HasJa = hasJa == 1
+		res.Rows = append(res.Rows, w)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	res.Elapsed = time.Since(start)
+
+	countSQL := fmt.Sprintf("SELECT count(*) FROM (SELECT 1\n%s\nLIMIT %d)", body, CountCap+1)
+	if err := s.DB.QueryRowContext(ctx, countSQL, b.args...).Scan(&res.Total); err != nil {
+		return nil, err
+	}
+	if res.Total > CountCap {
+		res.Total = CountCap
+		res.Capped = true
+	}
+	return res, nil
+}
+
+// SearchSourceURLs は同じ条件で source_url だけを返す。コレクションへの
+// 一括追加に使う。メンバーのキーは source_url (spec_collections.md §3) なので、
+// ここで id を引いても意味がない。
+//
+// 追加は「その時点の検索結果を行に展開する」操作で、条件は保存しない。
+func (s *Store) SearchSourceURLs(ctx context.Context, p SearchParams, limit int) ([]string, error) {
+	b := s.searchBuilder(&p)
+	query := "SELECT i.source_url\n" + b.body() + "\n" + b.order +
+		fmt.Sprintf("\nLIMIT %d", limit)
+
+	rows, err := s.DB.QueryContext(ctx, query, b.args...)
+	if err != nil {
+		return nil, fmt.Errorf("検索に失敗しました: %w\n\n%s", err, query)
+	}
+	defer rows.Close()
+
+	var out []string
+	for rows.Next() {
+		var u string
+		if err := rows.Scan(&u); err != nil {
+			return nil, err
+		}
+		out = append(out, u)
+	}
+	return out, rows.Err()
+}
+
+// searchBuilder は検索条件を SQL の断片に組み立てる。SearchWorks と
+// SearchSourceURLs で条件がずれると「画面で見た集合」と「コレクションに
+// 入る集合」が食い違うので、組み立ては 1 箇所だけに置く。
+func (s *Store) searchBuilder(p *SearchParams) *builder {
 	if p.Page < 1 {
 		p.Page = 1
 	}
@@ -357,56 +437,16 @@ func (s *Store) SearchWorks(ctx context.Context, p SearchParams) (*SearchResult,
 		}
 	}
 
-	cols := append([]string{
-		"i.id", "i.source", "coalesce(i.source_id, '')", "coalesce(i.title, '')",
-		"coalesce(tj.text, '')", "coalesce(i.artist, '')", "coalesce(i.date, '')",
-		"coalesce(i.style, '')", "coalesce(i.category, '')", "coalesce(i.medium, '')",
-		"i.source_url", "coalesce(i.image_url, '')",
-	}, b.sel...)
+	return b
+}
 
+// body は FROM 以降。SELECT する列だけを差し替えて使い回す。
+func (b *builder) body() string {
 	where := ""
 	if len(b.where) > 0 {
 		where = "WHERE " + strings.Join(b.where, "\n  AND ")
 	}
-	body := strings.Join(b.from, "\n") + "\n" + where
-
-	query := "SELECT " + strings.Join(cols, ", ") + "\n" + body + "\n" + b.order +
-		fmt.Sprintf("\nLIMIT %d OFFSET %d", p.Per, (p.Page-1)*p.Per)
-
-	start := time.Now()
-	rows, err := s.DB.QueryContext(ctx, query, b.args...)
-	if err != nil {
-		return nil, fmt.Errorf("検索に失敗しました: %w\n\n%s", err, query)
-	}
-	defer rows.Close()
-
-	res := &SearchResult{Page: p.Page, Per: p.Per, SQL: query, Args: b.args, Notes: b.notes}
-	for rows.Next() {
-		var w WorkRow
-		var hasJa int
-		if err := rows.Scan(&w.ID, &w.Source, &w.SourceID, &w.Title, &w.TitleJa, &w.Artist,
-			&w.Date, &w.Style, &w.Category, &w.Medium, &w.SourceURL, &w.ImageURL,
-			&w.YearStart, &w.YearEnd, &w.YearKind, &w.Precision,
-			&hasJa, &w.ArtistCount, &w.CreatorCount, &w.PersonCount); err != nil {
-			return nil, err
-		}
-		w.HasJa = hasJa == 1
-		res.Rows = append(res.Rows, w)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	res.Elapsed = time.Since(start)
-
-	countSQL := fmt.Sprintf("SELECT count(*) FROM (SELECT 1\n%s\nLIMIT %d)", body, CountCap+1)
-	if err := s.DB.QueryRowContext(ctx, countSQL, b.args...).Scan(&res.Total); err != nil {
-		return nil, err
-	}
-	if res.Total > CountCap {
-		res.Total = CountCap
-		res.Capped = true
-	}
-	return res, nil
+	return strings.Join(b.from, "\n") + "\n" + where
 }
 
 func placeholders(n int) string {

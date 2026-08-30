@@ -7,7 +7,7 @@
   <code>ix.search_ja</code> / <code>ix.facet</code>)。結果は {{$d.Limit}} 行で打ち切ります。
 </p>
 
-<form method="get" action="/sql" class="sqlform">
+<form method="get" action="{{u "/sql"}}" class="sqlform">
   <textarea name="sql" rows="8" spellcheck="false" placeholder="SELECT source, count(*) FROM images GROUP BY 1">{{$d.SQL}}</textarea>
   <div class="row main">
     <button type="submit">実行 <span class="muted">(Ctrl+Enter)</span></button>
@@ -24,12 +24,12 @@
 <details class="sqlpanel">
   <summary>よく使う問い合わせ</summary>
   <ul class="samples">
-    <li><a href="/sql?sql={{"SELECT source, count(*) n FROM images GROUP BY 1 ORDER BY n DESC"}}">ソース別の件数</a></li>
-    <li><a href="/sql?sql={{"SELECT style, count(*) n FROM images WHERE style <> '' GROUP BY 1 ORDER BY n DESC LIMIT 50"}}">style の分布</a></li>
-    <li><a href="/sql?sql={{"SELECT name_raw, count(*) n FROM image_artists WHERE person_key IS NULL GROUP BY 1 ORDER BY n DESC LIMIT 50"}}">名寄せ漏れの多い表記</a></li>
-    <li><a href="/sql?sql={{"SELECT i.source, i.title, t.text FROM image_translations t JOIN images i ON i.id = t.image_id WHERE t.confidence <> 'high' LIMIT 50"}}">確信度が high でない訳題</a></li>
-    <li><a href="/sql?sql={{"SELECT date_precision, count(*) n, min(date_start), max(date_end) FROM image_dates GROUP BY 1 ORDER BY n DESC"}}">date_precision ごとの年の範囲</a></li>
-    <li><a href="/sql?sql={{"SELECT i.id, i.title, d.date_start, d.date_end FROM image_dates d JOIN images i ON i.id = d.image_id WHERE d.date_start > d.date_end LIMIT 50"}}">開始 &gt; 終了 になっている年 (異常)</a></li>
+    <li><a href="{{u "/sql"}}?sql={{"SELECT source, count(*) n FROM images GROUP BY 1 ORDER BY n DESC"}}">ソース別の件数</a></li>
+    <li><a href="{{u "/sql"}}?sql={{"SELECT style, count(*) n FROM images WHERE style <> '' GROUP BY 1 ORDER BY n DESC LIMIT 50"}}">style の分布</a></li>
+    <li><a href="{{u "/sql"}}?sql={{"SELECT name_raw, count(*) n FROM image_artists WHERE person_key IS NULL GROUP BY 1 ORDER BY n DESC LIMIT 50"}}">名寄せ漏れの多い表記</a></li>
+    <li><a href="{{u "/sql"}}?sql={{"SELECT i.source, i.title, t.text FROM image_translations t JOIN images i ON i.id = t.image_id WHERE t.confidence <> 'high' LIMIT 50"}}">確信度が high でない訳題</a></li>
+    <li><a href="{{u "/sql"}}?sql={{"SELECT date_precision, count(*) n, min(date_start), max(date_end) FROM image_dates GROUP BY 1 ORDER BY n DESC"}}">date_precision ごとの年の範囲</a></li>
+    <li><a href="{{u "/sql"}}?sql={{"SELECT i.id, i.title, d.date_start, d.date_end FROM image_dates d JOIN images i ON i.id = d.image_id WHERE d.date_start > d.date_end LIMIT 50"}}">開始 &gt; 終了 になっている年 (異常)</a></li>
   </ul>
 </details>
 {{end}}

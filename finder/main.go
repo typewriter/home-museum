@@ -30,7 +30,13 @@ func main() {
 	fs := flag.NewFlagSet("finder", flag.ExitOnError)
 	dbPath := fs.String("db", env("DATABASE_PATH", "../importer/hm.db"), "hm.db のパス (読み取り専用で開く)")
 	indexPath := fs.String("index", env("FINDER_INDEX", "./index.db"), "検索インデックスのパス")
+	collPath := fs.String("collections", env("FINDER_COLLECTIONS", "./collections.db"),
+		"コレクションの DB (finder が書き込む唯一のデータ。空にすると機能ごと無効)")
+	collDir := fs.String("collections-dir", env("FINDER_COLLECTIONS_DIR", "./collections"),
+		"collections export / import が読み書きするディレクトリ")
 	addr := fs.String("addr", env("FINDER_ADDR", "127.0.0.1:8081"), "待ち受けアドレス")
+	basePath := fs.String("base-path", env("FINDER_BASE_PATH", ""),
+		`リバースプロキシがパスベースで振り分けるときの接頭辞 (例: "/art-finder")。空ならルート直下`)
 	allowSQL := fs.Bool("sql", true, "読み取り専用 SQL コンソールを有効にする")
 	timeout := fs.Duration("timeout", 30*time.Second, "1 クエリの上限時間")
 	imgStore := fs.String("images", env("FINDER_IMAGE_STORE", ""),
@@ -42,10 +48,12 @@ func main() {
 		fmt.Fprintf(os.Stderr, `finder — importer/hm.db を探索する内部ツール
 
 使い方:
-  finder [フラグ] [serve|index]
+  finder [フラグ] [serve|index|collections <export|import>]
 
-  serve   Web サーバーを起動する (既定)
-  index   hm.db から index.db を作り直す
+  serve                  Web サーバーを起動する (既定)
+  index                  hm.db から index.db を作り直す
+  collections export     collections.db → collections/*.yaml,csv (git 用)
+  collections import     collections/*.yaml,csv → collections.db (全消し→再構築)
 
 フラグ:
 `)
@@ -55,11 +63,14 @@ func main() {
 	// サブコマンドはフラグの前後どちらに書いてもよいようにする。
 	args := os.Args[1:]
 	cmd := "serve"
+	sub := ""
 	var rest []string
 	for _, a := range args {
 		switch a {
-		case "serve", "index":
+		case "serve", "index", "collections":
 			cmd = a
+		case "export", "import":
+			sub = a
 		default:
 			rest = append(rest, a)
 		}
@@ -75,17 +86,21 @@ func main() {
 	switch cmd {
 	case "index":
 		err = index.Build(ctx, *dbPath, *indexPath, os.Stderr)
+	case "collections":
+		err = collections(ctx, *dbPath, *indexPath, *collPath, *collDir, sub)
 	case "serve":
 		err = serve(ctx, serveOptions{
-			DBPath:       *dbPath,
-			IndexPath:    *indexPath,
-			Addr:         *addr,
-			AllowSQL:     *allowSQL,
-			Timeout:      *timeout,
-			ImageStore:   *imgStore,
-			CachePath:    *cachePath,
-			ImageEvery:   *imgInterval,
-			ImageQuality: *imgQuality,
+			DBPath:          *dbPath,
+			IndexPath:       *indexPath,
+			CollectionsPath: *collPath,
+			Addr:            *addr,
+			BasePath:        *basePath,
+			AllowSQL:        *allowSQL,
+			Timeout:         *timeout,
+			ImageStore:      *imgStore,
+			CachePath:       *cachePath,
+			ImageEvery:      *imgInterval,
+			ImageQuality:    *imgQuality,
 		})
 	}
 	if err != nil && !errors.Is(err, http.ErrServerClosed) {
@@ -94,16 +109,17 @@ func main() {
 }
 
 type serveOptions struct {
-	DBPath, IndexPath, Addr string
-	AllowSQL                bool
-	Timeout                 time.Duration
-	ImageStore, CachePath   string
-	ImageEvery              time.Duration
-	ImageQuality            int
+	DBPath, IndexPath, CollectionsPath, Addr string
+	BasePath                                 string
+	AllowSQL                                 bool
+	Timeout                                  time.Duration
+	ImageStore, CachePath                    string
+	ImageEvery                               time.Duration
+	ImageQuality                             int
 }
 
 func serve(ctx context.Context, o serveOptions) error {
-	st, err := store.Open(o.DBPath, o.IndexPath)
+	st, err := store.Open(o.DBPath, o.IndexPath, o.CollectionsPath)
 	if err != nil {
 		return err
 	}
@@ -114,6 +130,11 @@ func serve(ctx context.Context, o serveOptions) error {
 		log.Printf("index  %s", st.IndexPath)
 	} else {
 		log.Printf("index  なし — `finder index` を実行すると全文検索が使えます")
+	}
+	if st.HasCollections {
+		log.Printf("コレクション %s (読み書き)", st.CollectionsPath)
+	} else {
+		log.Printf("コレクション 無効")
 	}
 
 	cache, err := openCache(ctx, o)
@@ -129,7 +150,7 @@ func serve(ctx context.Context, o serveOptions) error {
 	}
 
 	srv, err := web.New(st, web.Options{
-		AllowSQL: o.AllowSQL, QueryTimeout: o.Timeout, Cache: cache,
+		AllowSQL: o.AllowSQL, QueryTimeout: o.Timeout, Cache: cache, BasePath: o.BasePath,
 	})
 	if err != nil {
 		return err
@@ -149,6 +170,29 @@ func serve(ctx context.Context, o serveOptions) error {
 
 	log.Printf("http://%s", o.Addr)
 	return hs.ListenAndServe()
+}
+
+// collections は collections.db と git 用テキストの間を往復する。
+// spec_collections.md §6 — 復旧できない唯一のファイルなので、バックアップと
+// レビューは git に任せる。
+func collections(ctx context.Context, dbPath, indexPath, collPath, dir, sub string) error {
+	if collPath == "" {
+		return errors.New("-collections が空です。コレクションが無効になっています")
+	}
+	st, err := store.Open(dbPath, indexPath, collPath)
+	if err != nil {
+		return err
+	}
+	defer st.Close()
+
+	switch sub {
+	case "export":
+		return st.ExportCollections(ctx, dir, os.Stderr)
+	case "import":
+		return st.ImportCollections(ctx, dir, os.Stderr)
+	default:
+		return errors.New("collections の後に export か import を指定してください")
+	}
 }
 
 // openCache は画像キャッシュを用意する。-images が空なら nil を返し、

@@ -206,3 +206,30 @@ details.sqlpanel pre {
   padding: 10px; overflow-x: auto; font-size: 12px; line-height: 1.5;
 }
 ul.samples { padding-left: 20px; line-height: 1.9; }
+
+/* ---- コレクション ---- */
+
+/* 表のセルに収める小さなフォーム。行の高さを増やさないよう inline に並べる。 */
+form.inline { display: inline-flex; gap: 4px; align-items: center; margin: 0; }
+form.inline button { padding: 2px 7px; font-size: 12px; }
+form.inline select { padding: 2px 4px; font-size: 12px; max-width: 12em; }
+form.inline input[type=text], form.inline input:not([type]) { padding: 2px 6px; font-size: 12px; }
+
+button.danger { background: var(--warn-bg); color: var(--warn-fg); border-color: var(--warn-fg); }
+/* pill の中に置く「×」。ボタンに見せない。 */
+button.linkish {
+  background: none; border: none; color: var(--fg-muted);
+  padding: 0 0 0 4px; font-size: 12px; cursor: pointer;
+}
+button.linkish:hover { color: var(--warn-fg); filter: none; }
+
+table.grid td.order { white-space: nowrap; }
+table.grid td.order form.inline { margin-left: 6px; }
+table.grid td.note input { width: 100%; min-width: 8em; }
+table.grid td.title .ja { color: var(--fg-muted); font-size: 12px; margin-top: 2px; }
+table.grid td.title .hint { margin-top: 2px; }
+
+.summary .bulk { display: inline-flex; align-items: center; gap: 8px; margin-left: 12px; }
+.meta.collections { gap: 6px; }
+.meta.collections .pill { display: inline-flex; align-items: center; }
+.addto { margin-left: 6px; }

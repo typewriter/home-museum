@@ -4,7 +4,7 @@
 <p class="meta">
   集計 {{$d.ComputedAt.Format "2006-01-02 15:04:05"}}
   <span class="muted">({{dur $s.Elapsed}} / 10 分キャッシュ)</span>
-  <a class="btn ghost" href="/stats?refresh=1">再集計</a>
+  <a class="btn ghost" href="{{u "/stats"}}?refresh=1">再集計</a>
 </p>
 
 <section>

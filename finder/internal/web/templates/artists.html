@@ -2,7 +2,7 @@
 {{$d := .Data}}{{$p := $d.P}}{{$res := $d.Res}}
 <h1>作者 <span class="muted">normalize_person.rb が作った名寄せ結果 (artists)</span></h1>
 
-<form class="filters" method="get" action="/artists/">
+<form class="filters" method="get" action="{{u "/artists/"}}">
   <div class="row main">
     <input type="search" name="q" value="{{$p.Q}}" placeholder="代表表記に部分一致 (例: Monet)" autofocus>
     <label>典拠
@@ -21,7 +21,7 @@
       </select>
     </label>
     <button type="submit">検索</button>
-    <a class="btn ghost" href="/artists/unmatched">名寄せ漏れを見る</a>
+    <a class="btn ghost" href="{{u "/artists/unmatched"}}">名寄せ漏れを見る</a>
   </div>
 </form>
 
@@ -36,13 +36,13 @@
   <tbody>
   {{range $res.Rows}}
     <tr>
-      <td><a href="/artists/detail?key={{.PersonKey}}">{{.DisplayName}}</a></td>
+      <td><a href="{{u "/artists/detail"}}?key={{.PersonKey}}">{{.DisplayName}}</a></td>
       <td class="muted">{{orElse "—" .LifeSpan}}</td>
       <td><span class="kind {{.KeyKind}}">{{.KeyKind}}</span></td>
       <td><code class="muted">{{trunc 44 .PersonKey}}</code></td>
       <td class="num">{{comma .ImageCount}}</td>
       <td class="num">{{comma .EntryCount}}</td>
-      <td><a href="/?person_key={{.PersonKey}}">作品を見る</a></td>
+      <td><a href="{{u "/"}}?person_key={{.PersonKey}}">作品を見る</a></td>
     </tr>
   {{end}}
   </tbody>

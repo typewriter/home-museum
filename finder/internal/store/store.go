@@ -22,40 +22,50 @@ import (
 // AttachAlias は index.db を ATTACH するときのスキーマ名。
 const AttachAlias = "ix"
 
+// attachSpec は 1 つの ATTACH。読み取り専用にするかどうかは dsn の mode で
+// 決まる。ATTACH 先はメイン接続の読み取り専用フラグを継承しないので、
+// 読ませたいだけの DB には必ず mode=ro を書くこと (spec_collections.md §2)。
+type attachSpec struct{ alias, dsn string }
+
 var (
 	hookOnce sync.Once
 	// 接続フックはドライバ単位のグローバルなので、DSN → ATTACH 先の対応表を持つ。
 	attachMu    sync.RWMutex
-	attachByDSN = map[string]string{}
+	attachByDSN = map[string][]attachSpec{}
 )
 
-// registerHook は「この DSN で開いた接続には index.db を ATTACH する」フックを
-// 一度だけ登録する。database/sql はコネクションプールなので、Open 後に一回
-// ATTACH を実行しても他の接続には効かない。フックでしか賄えない。
+// registerHook は「この DSN で開いた接続には index.db / collections.db を
+// ATTACH する」フックを一度だけ登録する。database/sql はコネクションプール
+// なので、Open 後に一回 ATTACH を実行しても他の接続には効かない。
+// フックでしか賄えない。
 func registerHook() {
 	hookOnce.Do(func() {
 		sqlite3.RegisterConnectionHook(func(conn sqlite3.ExecQuerierContext, dsn string) error {
 			attachMu.RLock()
-			idx, ok := attachByDSN[dsn]
+			specs := attachByDSN[dsn]
 			attachMu.RUnlock()
-			if !ok || idx == "" {
-				return nil
+			for _, sp := range specs {
+				if _, err := conn.ExecContext(context.Background(),
+					fmt.Sprintf("ATTACH DATABASE '%s' AS %s", sp.dsn, sp.alias), nil); err != nil {
+					return err
+				}
 			}
-			_, err := conn.ExecContext(context.Background(),
-				fmt.Sprintf("ATTACH DATABASE '%s' AS %s", idx, AttachAlias), nil)
-			return err
+			return nil
 		})
 	})
 }
 
-// Store は hm.db (+ ATTACH した index.db) への接続。
+// Store は hm.db (+ ATTACH した index.db / collections.db) への接続。
 type Store struct {
-	DB        *sql.DB
-	DBPath    string
-	IndexPath string
+	DB              *sql.DB
+	DBPath          string
+	IndexPath       string
+	CollectionsPath string
 	// HasIndex が false のときは FTS 検索と正規化済み制作年が使えない。
 	// UI 側はその旨を出したうえで LIKE 検索にフォールバックする。
 	HasIndex bool
+	// HasCollections が false のときはコレクションの画面を一切出さない。
+	HasCollections bool
 }
 
 func roDSN(path string) string {
@@ -63,8 +73,15 @@ func roDSN(path string) string {
 		"?mode=ro&_pragma=busy_timeout(10000)&_pragma=cache_size(-64000)"
 }
 
-// Open は hm.db を読み取り専用で開く。indexPath が存在すればそれも ATTACH する。
-func Open(dbPath, indexPath string) (*Store, error) {
+// rwDSN は書き込みも許す ATTACH 用。collections.db は finder が唯一の書き手
+// なので、ここだけ mode=ro を付けない。
+func rwDSN(path string) string {
+	return "file:" + url.PathEscape(path) + "?_pragma=busy_timeout(10000)"
+}
+
+// Open は hm.db を読み取り専用で開く。indexPath が存在すればそれも ATTACH し、
+// collectionsPath が空でなければ (無ければ作って) 読み書き可能で ATTACH する。
+func Open(dbPath, indexPath, collectionsPath string) (*Store, error) {
 	abs, err := filepath.Abs(dbPath)
 	if err != nil {
 		return nil, err
@@ -75,20 +92,31 @@ func Open(dbPath, indexPath string) (*Store, error) {
 
 	st := &Store{DBPath: abs}
 	dsn := roDSN(abs)
+	var specs []attachSpec
 
 	if indexPath != "" {
 		if ia, err := filepath.Abs(indexPath); err == nil {
+			st.IndexPath = ia
 			if _, err := os.Stat(ia); err == nil {
-				st.IndexPath = ia
 				st.HasIndex = true
-				attachMu.Lock()
-				attachByDSN[dsn] = roDSN(ia)
-				attachMu.Unlock()
-			} else {
-				st.IndexPath = ia
+				specs = append(specs, attachSpec{AttachAlias, roDSN(ia)})
 			}
 		}
 	}
+	// collections.db は存在しなくてよい。ATTACH した時点で作られる。
+	if collectionsPath != "" {
+		ca, err := filepath.Abs(collectionsPath)
+		if err != nil {
+			return nil, err
+		}
+		st.CollectionsPath = ca
+		st.HasCollections = true
+		specs = append(specs, attachSpec{CollectionsAlias, rwDSN(ca)})
+	}
+
+	attachMu.Lock()
+	attachByDSN[dsn] = specs
+	attachMu.Unlock()
 	registerHook()
 
 	db, err := sql.Open("sqlite", dsn)
@@ -113,6 +141,18 @@ func Open(dbPath, indexPath string) (*Store, error) {
 			`SELECT count(*) FROM ix.sqlite_master WHERE name='image_meta'`).Scan(&n); err != nil || n == 0 {
 			db.Close()
 			return nil, fmt.Errorf("index.db (%s) を ATTACH できましたが image_meta がありません。`finder index` で作り直してください", st.IndexPath)
+		}
+	}
+	// collections.db のスキーマは接続ごとではなく一度だけ作ればよい
+	// (ファイルに残るため)。WAL にするのも同様。
+	if st.HasCollections {
+		if _, err := db.ExecContext(ctx, `PRAGMA co.journal_mode = WAL`); err != nil {
+			db.Close()
+			return nil, fmt.Errorf("collections.db (%s) に書き込めません: %w", st.CollectionsPath, err)
+		}
+		if _, err := db.ExecContext(ctx, collectionsDDL); err != nil {
+			db.Close()
+			return nil, fmt.Errorf("collections.db のスキーマ作成に失敗: %w", err)
 		}
 	}
 	st.DB = db

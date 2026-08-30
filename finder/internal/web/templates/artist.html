@@ -11,7 +11,7 @@
   {{else}}
     <span class="null">artists テーブルに行がありません (person_key だけが image_artists に付いている状態)</span>
   {{end}}
-  <a class="btn" href="/?person_key={{$a.PersonKey}}">作品を検索</a>
+  <a class="btn" href="{{u "/"}}?person_key={{$a.PersonKey}}">作品を検索</a>
 </p>
 
 <section>
