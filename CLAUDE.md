@@ -52,9 +52,9 @@ bundle exec ruby collection_generator.rb  # collections / collection_images を�
 ```bash
 cd importer
 bundle install
-ruby aic.rb           # → importer/aic.lmdb        (Art Institute of Chicago)
-ruby met.rb           # → importer/met.lmdb        (The Metropolitan Museum of Art)
-PARIS_TOKEN=xxx ruby parismusees.rb  # → importer/parismusees.lmdb (GraphQL、要 auth-token)
+ruby crawlers/aic.rb           # → importer/crawlers/aic.lmdb        (Art Institute of Chicago)
+ruby crawlers/met.rb           # → importer/crawlers/met.lmdb        (The Metropolitan Museum of Art)
+PARIS_TOKEN=xxx ruby crawlers/parismusees.rb  # → importer/crawlers/parismusees.lmdb (GraphQL、要 auth-token)
 
 ruby loader.rb                    # 全ソースを LMDB → hm.db (引数でソース名を絞れる)
 ruby loader.rb cleveland aic      # ソース指定
@@ -74,19 +74,19 @@ ruby apply_translations.rb stale   # 訳出時から原文が変わった行を�
 
 後半は互いに独立で順不同 (`seed` → `artists` の順序だけは意味がある。館由来の訳を LLM 訳で上書きしないため)。**いずれも LMDB を読まないので数分で終わる**。正規化ルールを直したときに `loader.rb` (Rijksmuseum 込みで30分超) を回し直す必要は無い。
 
-#### タイトル日本語訳 (`title_translation_batch.rb`)
+#### タイトル日本語訳 (`with_llms/title_translation_batch.rb`)
 
-`spec_normalization_title.md` の設計に基づき、`titles_ja_<source>.csv` を分割して埋めるツール。第1引数のソース名 (`Loaders::SOURCES` のキー) で入力 LMDB も出力 CSV も切り替わる。
+LLM を使う翻訳・名寄せ判定のスクリプト/プロンプト/Goツールは `importer/with_llms/` にまとめてある。`spec_normalization_title.md` の設計に基づき、`titles_ja_<source>.csv`(こちらも `with_llms/` 配下)を分割して埋めるツール。第1引数のソース名 (`Loaders::SOURCES` のキー) で入力 LMDB も出力 CSV も切り替わる。
 
 ```bash
-ruby title_translation_batch.rb sources              # 扱えるソース名の一覧
-ruby title_translation_batch.rb cleveland scan       # 対象一覧キャッシュを作る
-ruby title_translation_batch.rb cleveland status     # 進捗
-ruby title_translation_batch.rb cleveland next 50    # → .title_translation_batch_cleveland.json
-ruby title_translation_batch.rb cleveland append F   # 翻訳結果JSONを CSV へ追記
+ruby with_llms/title_translation_batch.rb sources              # 扱えるソース名の一覧
+ruby with_llms/title_translation_batch.rb cleveland scan       # 対象一覧キャッシュを作る
+ruby with_llms/title_translation_batch.rb cleveland status     # 進捗
+ruby with_llms/title_translation_batch.rb cleveland next 50    # → .title_translation_batch_cleveland.json
+ruby with_llms/title_translation_batch.rb cleveland append F   # 翻訳結果JSONを CSV へ追記
 ```
 
-進捗の唯一の状態は CSV そのもの (`source_url` の有無) なので、中断しても再開できる。`next`/`append` のたびに LMDB を全走査すると Rijksmuseum (47 万件の RDF/XML パースで 1 回 30 分超) が成立しないため、対象一覧は `.title_translation_targets_<source>.jsonl` にキャッシュする。**クローラーを再実行して母数が増えたら `scan` で作り直す**こと。実際に翻訳を回すのは `title_translator/` (Gemini API) か `title_translation_prompt.md` (サブエージェント)。
+進捗の唯一の状態は CSV そのもの (`source_url` の有無) なので、中断しても再開できる。`next`/`append` のたびに LMDB を全走査すると Rijksmuseum (47 万件の RDF/XML パースで 1 回 30 分超) が成立しないため、対象一覧は `.title_translation_targets_<source>.jsonl` にキャッシュする。**クローラーを再実行して母数が増えたら `scan` で作り直す**こと。実際に翻訳を回すのは `with_llms/title_translator/` (Gemini API) か `with_llms/title_translation_prompt.md` (サブエージェント)。
 
 ### finder
 
@@ -151,7 +151,7 @@ docker-compose up --build   # http://localhost:8080
 - **生の層 (`images`, `image_artists`) を書くのは `loader.rb` だけ**。派生値は別テーブルに分けてあるので `loader.rb` は既存行を upsert してよい (旧実装の insert only 制約は解消済み)。
 - 逆に **`loader.rb` に「解釈」を書いてはいけない**。館のデータをそのまま写す以上のこと (precision の分類、役割のバケット分け、名寄せ) は派生層の仕事。この線引きが崩れると、ルールを直すたびに LMDB 全走査が必要になる。
 - importer 側の DDL は `importer/schema.sql` に一本化されており、`db.rb` が接続のたびに冪等に適用する。ただし `server/initializer.rb` には依然として `images` の旧 DDL が残っている (server は別途作り直し予定)。
-- 各ソースのフィールドは `importer/loaders.rb` (`Loaders`) で共通スキーマにマッピングされる。パブリックドメインかつ画像 URL を持つレコードのみ通す。`loader.rb` と `title_translation_batch.rb` は同じ抽出条件・同じ `source_url` を見る必要がある (でないと翻訳 CSV が `images` に JOIN できない) ため、実装はここ 1 箇所だけに置く。`Loaders::SOURCES` がソース名 → LMDB ファイル名・表示ラベルの対応表 (`images.source` にはキーのほうが入る)。
+- 各ソースのフィールドは `importer/loaders.rb` (`Loaders`) で共通スキーマにマッピングされる。パブリックドメインかつ画像 URL を持つレコードのみ通す。`loader.rb` と `with_llms/title_translation_batch.rb` は同じ抽出条件・同じ `source_url` を見る必要がある (でないと翻訳 CSV が `images` に JOIN できない) ため、実装はここ 1 箇所だけに置く。`Loaders::SOURCES` がソース名 → LMDB ファイル名・表示ラベルの対応表 (`images.source` にはキーのほうが入る)。
 
 ### コレクション生成 (`server/collection_generator.rb`)
 

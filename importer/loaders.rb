@@ -5,11 +5,11 @@ require "rexml/document"
 
 # 各美術館の LMDB を images / image_artists と同じ共通スキーマのレコードへ変換する。
 #
-# LMDB を走査するのはここだけ (loader.rb と title_translation_batch.rb が使う)。
+# LMDB を走査するのはここだけ (loader.rb と with_llms/title_translation_batch.rb が使う)。
 # Rijksmuseum の RDF パースは全走査に数十分かかるため、正規化ルールの適用は
 # LMDB ではなく DB を読む別スクリプト (normalize_*.rb) 側に置いてある。
 #
-# hm.db への投入 (loader.rb) とタイトル日本語訳 (title_translation_batch.rb) は
+# hm.db への投入 (loader.rb) とタイトル日本語訳 (with_llms/title_translation_batch.rb) は
 # 「どのレコードを対象とするか」の条件と source_url の作り方が一致していないと
 # CSV が images に JOIN できなくなるため、抽出はここ1箇所だけに実装する。
 #
@@ -28,12 +28,12 @@ module Loaders
   # ソース名 → images.source に入るキーと、既定の LMDB ファイル名。
   # label は人間向けの表示名で、DB には入らない (CSV の可読性のためだけに使う)。
   SOURCES = {
-    "aic"         => { label: "AIC",                     lmdb: "aic.lmdb" },
-    "met"         => { label: "MET",                     lmdb: "met.lmdb" },
-    "parismusees" => { label: "Paris Musées",            lmdb: "parismusees.lmdb" },
-    "rijksmuseum" => { label: "Rijksmuseum",             lmdb: "rijksmuseum.lmdb" },
-    "smithsonian" => { label: "Smithsonian",             lmdb: "smithsonian.lmdb" },
-    "cleveland"   => { label: "Cleveland Museum of Art", lmdb: "cleveland.lmdb" },
+    "aic"         => { label: "AIC",                     lmdb: "crawlers/aic.lmdb" },
+    "met"         => { label: "MET",                     lmdb: "crawlers/met.lmdb" },
+    "parismusees" => { label: "Paris Musées",            lmdb: "crawlers/parismusees.lmdb" },
+    "rijksmuseum" => { label: "Rijksmuseum",             lmdb: "crawlers/rijksmuseum.lmdb" },
+    "smithsonian" => { label: "Smithsonian",             lmdb: "crawlers/smithsonian.lmdb" },
+    "cleveland"   => { label: "Cleveland Museum of Art", lmdb: "crawlers/cleveland.lmdb" },
   }.freeze
 
   module_function
