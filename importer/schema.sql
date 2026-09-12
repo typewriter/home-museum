@@ -54,11 +54,17 @@ CREATE TABLE IF NOT EXISTS image_artists (
   authority_urls         TEXT,           -- 外部典拠URLのJSON配列 (ULAN/Wikidata/VIAF/RKD)
   name_original_language TEXT,           -- 原語表記 (Cleveland name_in_original_language)
   role_bucket            TEXT,           -- ← normalize_artists.rb が埋める派生列
+  -- ↓ normalize_person.rb が埋める派生列。spec_normalization_author.md 「名寄せ結果の記録」
+  person_key             TEXT,           -- 名寄せ先 ('ulan:500031075' | 'cluster:aic|27558')。FK ではない
+  match_method           TEXT,           -- 発火したルール (authority_id / name_exact / llm …)
+  match_confidence       TEXT,           -- high | medium | low
+  match_reason           TEXT,           -- 自由記述。手法ごとに書ける内容が違ってよい
   UNIQUE (image_id, position)
 );
 
 CREATE INDEX IF NOT EXISTS image_artists_image ON image_artists (image_id);
 CREATE INDEX IF NOT EXISTS image_artists_name ON image_artists (name_raw);
+CREATE INDEX IF NOT EXISTS image_artists_person ON image_artists (person_key);
 
 -- ===================== 派生: 各スクリプトが作り直せる =====================
 
@@ -86,6 +92,19 @@ CREATE TABLE IF NOT EXISTS image_translations (
   translated_at TEXT,
   PRIMARY KEY (image_id, field, lang)
 );
+
+-- 名寄せした人物。主キーは autoincrement ではなく person_key (外部の典拠ID、または
+-- クラスタの代表メンバーから決定的に導いた値) なので、再実行すれば同じキーになる。
+-- 人物単位でぶら下がるものが無いため、丸ごと作り直してよい。spec_schema.md §4
+CREATE TABLE IF NOT EXISTS artists (
+  person_key   TEXT PRIMARY KEY,
+  display_name TEXT NOT NULL,   -- 役割接頭辞を除いた表記の最頻値。spec_schema.md §5
+  birth_year   INTEGER,
+  death_year   INTEGER,
+  image_count  INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS artists_image_count ON artists (image_count);
 
 -- 作者エントリ単位の名前訳。人物単位ではないので同姓同名の誤統合が起きない。
 -- 名寄せ (artists テーブル) を導入したら、その訳を優先しつつ本テーブルは
