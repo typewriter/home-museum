@@ -69,3 +69,15 @@ build-iPhoneSimulator/
 
 # Crawler resume markers
 *.resume
+
+# Title translation work files (regenerable from LMDB; the CSVs are the deliverable)
+.title_translation_batch_*.json
+.title_translation_targets_*
+.author_merge_batch.json
+
+# with_llms/: kept locally, not tracked (translation data, LLM prompts, go build output)
+with_llms/titles_ja_*.csv
+with_llms/*_prompt.md
+with_llms/*/prompt.md
+with_llms/title_translator/title_translator
+with_llms/author_merger/author_merger

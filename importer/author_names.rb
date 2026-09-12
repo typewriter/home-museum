@@ -1,4 +1,4 @@
-# 作者名の正規化。normalize_person.rb と author_merge_batch.rb が共有する。
+# 作者名の正規化。normalize_person.rb と with_llms/author_merge_batch.rb が共有する。
 # 判断の根拠 (なぜソースごとに括弧の扱いを変えるか等) は spec_normalization_author.md。
 
 module AuthorNames

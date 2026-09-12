@@ -4,7 +4,7 @@
 # normalize_person.rb を回し直せば作り直せるが、LLM の判定は作り直せないため。
 # titles_ja_<source>.csv と apply_translations.rb の関係と同じ構図。
 #
-#   author_merge_batch.rb append  → CSV に追記し、DB へ差分適用 (速い)
+#   with_llms/author_merge_batch.rb append  → CSV に追記し、DB へ差分適用 (速い)
 #   normalize_person.rb           → 段階1〜6 の後に CSV を読んで同じ結果を再現
 #
 # person_key を参照しているので、キーが安定していることが前提になる。典拠ID由来の
@@ -62,7 +62,7 @@ module AuthorMerges
   # 指示を union-find でまとめ、各グループの代表キーを返す。
   #   { 元のkey => 統合先のkey }  (代表キー自身は含めない)
   #
-  # `targets` を渡すとその行だけを対象にする。増分適用 (author_merge_batch.rb の
+  # `targets` を渡すとその行だけを対象にする。増分適用 (with_llms/author_merge_batch.rb の
   # append) では今回追記した行だけを渡すこと。**適用済みの行は統合元のキーが
   # 消えているため、全行を渡すと「解決できない」として毎回警告が出る**。
   # normalize_person.rb は段階1〜6 から作り直すので全行を渡してよい。

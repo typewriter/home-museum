@@ -13,7 +13,7 @@
 #   7 LLM の判定 (author_merges.csv)
 #
 # 段階7 の判定は author_merges.csv が正本なので、このスクリプトを何度回しても
-# 失われない。判定を作るのは author_merge_batch.rb (指示は author_migration_prompt.md)。
+# 失われない。判定を作るのは with_llms/author_merge_batch.rb (指示は with_llms/author_migration_prompt.md)。
 #
 # 段階7以降で保留にしている手法 (first+last / 編集距離) を足すときは、段階6の下に
 # もう1つ merge_by を足して match_method の値を増やすだけでよく、スキーマは変わらない。
