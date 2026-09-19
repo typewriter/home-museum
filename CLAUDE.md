@@ -47,7 +47,7 @@ bundle exec ruby collection_generator.rb  # collections / collection_images を�
 
 スクリプトごとの引数・所要時間・再開方式は `importer/README.md` にまとめてある。
 
-各クローラーは自身の LMDB ストア (`kv_store.rb` の `KVStore` でラップ) に生 JSON を蓄積し、`loader.rb` がそれらを読んで `hm.db` に投入する。中断しても壊れないが、再開方式はソースごとに違う (取得済み ID のスキップ / `*.resume` ファイル / offset)。**AIC だけは再開の仕組みが無く、毎回先頭から取り直す**。
+各クローラーは自身の LMDB ストア (`kv_store.rb` の `KVStore` でラップ) に生 JSON を蓄積し、`loader.rb` がそれらを読んで `hm.db` に投入する。中断しても壊れないが、再開方式はソースごとに違う (取得済み ID のスキップ / `*.resume` ファイル / offset)。**AIC と Wikimedia は再開の仕組みが無く、毎回先頭から取り直す**(Wikimediaは書き込みの重複だけ避ける。詳細は `importer/README.md`)。
 
 ```bash
 cd importer

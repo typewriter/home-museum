@@ -30,6 +30,18 @@ func TestOriginURL(t *testing.T) {
 			want:  "https://iiif.micr.io/owHmZ/full/1600,/0/default.jpg",
 		},
 		{
+			name:  "wikimedia は Special:FilePath に ?width= を付ける",
+			ref:   Ref{Source: "wikimedia", ImageURL: "https://commons.wikimedia.org/wiki/Special:FilePath/Mona%20Lisa.jpg"},
+			width: 1600,
+			want:  "https://commons.wikimedia.org/wiki/Special:FilePath/Mona%20Lisa.jpg?width=1600",
+		},
+		{
+			name:  "wikimedia は既存クエリがあれば & で足す",
+			ref:   Ref{Source: "wikimedia", ImageURL: "https://commons.wikimedia.org/wiki/Special:FilePath/Foo.jpg?page=2"},
+			width: 400,
+			want:  "https://commons.wikimedia.org/wiki/Special:FilePath/Foo.jpg?page=2&width=400",
+		},
+		{
 			name:  "IIIF でない館はそのまま",
 			ref:   Ref{Source: "cleveland", ImageURL: "https://openaccess-cdn.clevelandart.org/1919.55/1919.55_print.jpg"},
 			width: 1600,

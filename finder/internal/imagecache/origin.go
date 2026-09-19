@@ -47,6 +47,15 @@ func OriginURL(r Ref, width int) string {
 		if m := iiifSize.FindStringSubmatchIndex(r.ImageURL); m != nil {
 			return r.ImageURL[:m[2]] + fmt.Sprintf("%d,", width) + r.ImageURL[m[3]:]
 		}
+	case "wikimedia":
+		// image_url は Special:FilePath (原寸へのリダイレクト)。MediaWiki は
+		// この形に ?width= を付けると縮小版へリダイレクトしてくれるので、
+		// IIIF の館と同じくサムネイルだけ要求して転送量を減らせる。
+		sep := "?"
+		if strings.Contains(r.ImageURL, "?") {
+			sep = "&"
+		}
+		return fmt.Sprintf("%s%swidth=%d", r.ImageURL, sep, width)
 	}
 	return r.ImageURL
 }

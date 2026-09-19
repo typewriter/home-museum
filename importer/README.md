@@ -35,6 +35,9 @@ Ruby 4.0.6 (`.ruby-version`)。`hm.db` の場所は環境変数 `DATABASE_PATH` 
 | `ruby crawlers/rijksmuseum.rb` | `crawlers/rijksmuseum.lmdb` | 838,386 | `crawlers/rijksmuseum.resume` に resumptionToken | OAI-PMH / RDF-XML |
 | `ruby crawlers/smithsonian.rb` | `crawlers/smithsonian.lmdb` | 96,529 | `crawlers/smithsonian.resume` に完了シャード URL | S3 のバルクメタデータ。API キー不要 |
 | `ruby crawlers/cleveland.rb` | `crawlers/cleveland.lmdb` | 66,833 | `crawlers/cleveland.resume` | 5〜10秒/ページ |
+| `ruby crawlers/wikimedia.rb` | `crawlers/wikimedia.lmdb` | (要実測) | **なし**(毎回先頭から。書き込みの重複だけ `KVStore#has?` で避ける) | 他と違い館のREST APIではなく、Wikidataの truthy ダンプ(N-Triples, 圧縮40GB超)を`curl \| bzcat`でストリーム処理する。ディスクには保存しない。painting/drawing/print/mosaic/frescoでpublic domainかつ画像ありのものだけ抽出。**1回のフル実行はネットワーク・CPU次第で数時間〜半日以上かかる見込み** |
+
+Wikimediaだけは作者(creator)の生没年をダンプ単体では取れない(参照QIDのみ)ため、抽出後に別途 `ruby crawlers/wikimedia.rb enrich` を実行する。これが唯一のライブHTTPで、Wikidata API (`wbgetentities`)を50件バッチ・1秒間隔で叩き、429を受けたら`Retry-After`ヘッダーに従って待つ。結果は同じLMDBに`author:Q...`キーで格納される。
 
 LMDB の mapsize (`KVStore::MAP_SIZE`) は 64GB。**仮想アドレス空間の予約であって実ディスク消費ではない**ので、大きくても害はない。使い切ると `LMDB::Error::MAP_FULL` でクローラーが落ちるが、既に書けている分は無事なので定数を上げて再開すればよい。一時的に上げたいだけなら環境変数 `LMDB_MAP_SIZE` (バイト数) で上書きできる。
 
@@ -69,7 +72,7 @@ ruby loader.rb aic=/path/to.lmdb  # LMDB のパスを明示
 | `ruby normalize_person.rb` | `artists`, `image_artists.person_key` ほか3列 | 同一人物の名寄せ。典拠ID (ULAN/Wikidata/VIAF/RKD) を起点に段階1〜7 を適用する。仕様は [`spec_normalization_author.md`](spec_normalization_author.md) |
 | `ruby with_llms/author_merge_batch.rb status \| next N \| append F` | `author_merges.csv`, 上の3列 | 機械ルールで統合できなかった作者を LLM に判定させる (段階7)。指示は [`with_llms/author_migration_prompt.md`](with_llms/author_migration_prompt.md) |
 
-引数の `SOURCE` は `aic` / `met` / `parismusees` / `rijksmuseum` / `smithsonian` / `cleveland`。省略すると全ソース。
+引数の `SOURCE` は `aic` / `met` / `parismusees` / `rijksmuseum` / `smithsonian` / `cleveland` / `wikimedia`。省略すると全ソース。
 
 順序は基本的に自由だが、例外が2つ。
 
@@ -184,3 +187,4 @@ select coalesce(t.text, i.title) as title,
 - `sqlite3` gem は 2.x。`execute` へのバインド変数は可変長引数ではなく**配列**で渡す
 - SQLite では二重引用符は文字列ではなく**識別子**を意味する。`where method = "source"` は `images.source` 列との比較になってしまうので、文字列リテラルには単一引用符を使う
 - 名寄せ (同一人物の統合) は未実装。作者名の日本語訳はエントリ単位なので、名寄せ無しでも表示は成立する
+- `crawlers/*.rb` はいずれも `require_relative '../kv_store'` で `importer/kv_store.rb` を見る (クローラーを `crawlers/` へ移した際に相対パスの更新が漏れていたバグを wikimedia.rb 追加時に修正した)

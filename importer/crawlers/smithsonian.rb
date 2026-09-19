@@ -2,7 +2,7 @@ require 'net/http'
 require 'uri'
 require 'json'
 require 'set'
-require_relative 'kv_store'
+require_relative '../kv_store'
 require 'time'
 
 module Smithsonian

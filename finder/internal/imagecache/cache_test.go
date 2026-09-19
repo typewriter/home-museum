@@ -75,6 +75,9 @@ func TestFetchStates(t *testing.T) {
 			http.Error(w, "just a moment", http.StatusForbidden)
 		case "/forbidden.jpg":
 			http.Error(w, "no ua", http.StatusForbidden)
+		case "/limited.jpg":
+			w.Header().Set("Retry-After", "120")
+			http.Error(w, "slow down", http.StatusTooManyRequests)
 		}
 	}))
 	defer srv.Close()
@@ -91,6 +94,7 @@ func TestFetchStates(t *testing.T) {
 		{"5xx は failed (再試行する)", "/boom.jpg", StateFailed},
 		{"cf-mitigated 付き 403 は gone (チャレンジは解けない)", "/challenge.jpg", StateGone},
 		{"cf-mitigated なし 403 は failed (UA/Referer で直るかもしれない)", "/forbidden.jpg", StateFailed},
+		{"429 は failed (Retry-After に従って再試行する)", "/limited.jpg", StateFailed},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -117,6 +121,79 @@ func TestFetchStates(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// 429 の Retry-After が長ければ、既定の指数バックオフより優先されること。
+// (短ければ既定のバックオフのままでよい。「サーバーの指定より長く待つ」のは
+// 礼儀に反しないため、大きい方を採る設計になっている)
+func TestRetryAfterOverridesBackoffWhenLonger(t *testing.T) {
+	c := newTestCache(t)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Retry-After", "10000") // 初回の既定バックオフ(10分=600秒)よりずっと長い
+		http.Error(w, "slow down", http.StatusTooManyRequests)
+	}))
+	defer srv.Close()
+
+	ctx := context.Background()
+	ref := Ref{ID: 1, Source: "wd", SourceURL: srv.URL + "/x.jpg", ImageURL: srv.URL + "/x.jpg"}
+	if _, err := c.Request(ctx, ref); err != nil {
+		t.Fatal(err)
+	}
+	c.step(ctx, ref.Source)
+
+	var state, retryAfter string
+	err := c.db.QueryRowContext(ctx,
+		`SELECT state, retry_after FROM image_cache WHERE url_hash = ?`, Hash(ref.SourceURL),
+	).Scan(&state, &retryAfter)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if state != StateFailed {
+		t.Fatalf("state = %q, want %q", state, StateFailed)
+	}
+	retryAt, err := time.Parse(time.RFC3339Nano, retryAfter)
+	if err != nil {
+		t.Fatalf("retry_after をパースできません: %q: %v", retryAfter, err)
+	}
+	wait := time.Until(retryAt)
+	if wait < 9*time.Minute+30*time.Second || wait > 3*time.Hour {
+		t.Fatalf("retry_after までの待ち時間 = %s, Retry-After: 10000 に近い値 (約2.8時間) を期待", wait)
+	}
+}
+
+// 429 の Retry-After が極端に大きくても (誤設定や悪意のいずれでも)、指数
+// バックオフと同じ maxBackoff (24h) で頭打ちにすること。ここが無いと、
+// おかしな値を返す相手に対して failed のまま無期限に固着しうる。
+func TestRetryAfterCappedAtMaxBackoff(t *testing.T) {
+	c := newTestCache(t)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Retry-After", "1000000") // 約11.6日、24hよりずっと長い
+		http.Error(w, "slow down", http.StatusTooManyRequests)
+	}))
+	defer srv.Close()
+
+	ctx := context.Background()
+	ref := Ref{ID: 1, Source: "wd2", SourceURL: srv.URL + "/y.jpg", ImageURL: srv.URL + "/y.jpg"}
+	if _, err := c.Request(ctx, ref); err != nil {
+		t.Fatal(err)
+	}
+	c.step(ctx, ref.Source)
+
+	var retryAfter string
+	err := c.db.QueryRowContext(ctx,
+		`SELECT retry_after FROM image_cache WHERE url_hash = ?`, Hash(ref.SourceURL),
+	).Scan(&retryAfter)
+	if err != nil {
+		t.Fatal(err)
+	}
+	retryAt, err := time.Parse(time.RFC3339Nano, retryAfter)
+	if err != nil {
+		t.Fatalf("retry_after をパースできません: %q: %v", retryAfter, err)
+	}
+	wait := time.Until(retryAt)
+	if wait > maxBackoff+time.Minute {
+		t.Fatalf("retry_after までの待ち時間 = %s, maxBackoff (%s) を超えないことを期待", wait, maxBackoff)
 	}
 }
 
@@ -176,6 +253,29 @@ func TestRecoverStuck(t *testing.T) {
 	e, _, _ := c.lookup(ctx, Hash(ref.SourceURL))
 	if e.State != StateQueued {
 		t.Fatalf("state = %q, want %q", e.State, StateQueued)
+	}
+}
+
+// Retry-After は秒数と HTTP-date のどちらの形式でも来る (RFC 9110 §10.2.3)。
+func TestParseRetryAfter(t *testing.T) {
+	now := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+	cases := []struct {
+		name  string
+		value string
+		want  time.Time
+	}{
+		{"秒数", "120", now.Add(120 * time.Second)},
+		{"空 = 指定なし", "", time.Time{}},
+		{"負数は無視", "-1", time.Time{}},
+		{"読めない値は無視", "not-a-date", time.Time{}},
+		{"HTTP-date", "Mon, 01 Jan 2024 00:02:00 GMT", now.Add(2 * time.Minute)},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := parseRetryAfter(tc.value, now); !got.Equal(tc.want) {
+				t.Errorf("parseRetryAfter(%q) = %v, want %v", tc.value, got, tc.want)
+			}
+		})
 	}
 }
 

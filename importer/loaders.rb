@@ -34,6 +34,7 @@ module Loaders
     "rijksmuseum" => { label: "Rijksmuseum",             lmdb: "crawlers/rijksmuseum.lmdb" },
     "smithsonian" => { label: "Smithsonian",             lmdb: "crawlers/smithsonian.lmdb" },
     "cleveland"   => { label: "Cleveland Museum of Art", lmdb: "crawlers/cleveland.lmdb" },
+    "wikimedia"   => { label: "Wikimedia Commons",       lmdb: "crawlers/wikimedia.lmdb" },
   }.freeze
 
   module_function
@@ -354,6 +355,89 @@ module Loaders
         description: text_for.call(cho.get_elements("dc:description")),
         source_url: aggregation.get_elements("edm:isShownAt").first&.attributes&.[]("rdf:resource"),
         image_url: image_url,
+        artists: artists,
+      })
+    }
+  end
+
+  # 対象クラスのQID→ラベル、BCE対応の年パースはどちらも crawlers/wikimedia.rb が
+  # 唯一の定義を持つ (二重管理を避けるため)。ここでは読み込んで再利用するだけ。
+  require_relative "crawlers/wikimedia"
+
+  # BCEの年 (負数) を含みうる [start, end] を表示用文字列にする。
+  # 単純に "-" で連結すると -100/-50 が "-100--50" のような曖昧な二重ハイフンに
+  # なるため、マイナス記号と衝突しない区切り記号を使う。
+  def wikimedia_date_range(date_start, date_end)
+    return date_start.to_s if date_start && date_end.nil?
+    return date_end.to_s if date_end && date_start.nil?
+    return nil if date_start.nil?
+    return date_start.to_s if date_start == date_end
+
+    "#{date_start}–#{date_end}" # en dash
+  end
+
+  def wikimedia(path)
+    # "author:Q..." (crawlers/wikimedia.rb enrich が書いた作者情報) と作品本体を
+    # 1回の store.each で振り分けて集める。別々に2回スキャンすると LMDB を
+    # 二度読むことになり、件数が伸びたときに無視できないI/Oになる。
+    authors = {}
+    artworks = []
+    store = KVStore.new(path)
+    begin
+      store.each { |key, value|
+        if key.start_with?("author:")
+          authors[key.delete_prefix("author:")] = JSON.parse(value)
+        else
+          artworks << value
+        end
+      }
+    ensure
+      store.close
+    end
+
+    artworks.each { |raw|
+      json = JSON.parse(raw)
+      next if !present(json["image_url"])
+
+      titles = json["titles"] || {}
+      title = present(titles["en"]) || present(json["label_en"]) ||
+              present(titles.values.compact.first) || present(json["label_ja"])
+
+      creators = json["creators"] || []
+      artists = creators.map { |qid|
+        author = authors[qid] || {}
+        name = present(author["name_en"]) || present(author["name_ja"])
+        {
+          name_raw: name || qid,
+          birth_year: author["birth_year"],
+          death_year: author["death_year"],
+          source_artist_id: qid,
+          authority_urls: authority_urls("https://www.wikidata.org/wiki/#{qid}"),
+        }
+      }
+
+      date_start = Wikimedia.wikidata_year(json["inception_start"])
+      date_end = Wikimedia.wikidata_year(json["inception_end"])
+
+      yield({
+        source: "wikimedia",
+        source_id: json["qid"],
+        category: (json["instance_of"] || []).filter_map { |q| Wikimedia::TARGET_CLASSES[q] }.join(", "),
+        style: nil,
+        title: title,
+        artist: artists.map { |a| a[:name_raw] }.join(", "),
+        date: wikimedia_date_range(date_start, date_end),
+        date_raw_start: date_start,
+        date_raw_end: date_end,
+        date_raw_precision: nil,
+        medium: nil,
+        origin: nil,
+        dimensions: nil,
+        credit: nil,
+        description: nil,
+        source_url: "https://www.wikidata.org/wiki/#{json["qid"]}",
+        # Special:FilePath は http/https どちらでも同じ実体にリダイレクトされる。
+        image_url: json["image_url"].sub(/\Ahttp:/, "https:"),
         artists: artists,
       })
     }

@@ -247,21 +247,42 @@ func (c *Cache) markReady(ctx context.Context, hash string, vs []Variant) error 
 // markFailed は一時的な失敗。指数バックオフで retry_after を伸ばし、
 // 回数を超えたら gone に落とす。
 func (c *Cache) markFailed(ctx context.Context, e Entry, cause error) error {
+	return c.markFailedAt(ctx, e, cause, time.Time{})
+}
+
+// maxBackoff は指数バックオフの上限。サーバー指定の Retry-After にも同じ上限を
+// 適用する (下記 markFailedAt)。上限を揃えないと、異常に大きい Retry-After を
+// 返す相手 (誤設定・悪意のいずれでも) に対して failed のまま無期限に固着しうる。
+const maxBackoff = 24 * time.Hour
+
+// markFailedAt は markFailed と同じだが、サーバーが Retry-After で明示してきた
+// 次回再試行時刻 (serverRetryAfter) を考慮する。指数バックオフより遅ければ
+// そちらを優先し (礼儀として要求を尊重する)、早ければ無視する
+// (極端に短い指定で叩き過ぎないための下限として既存のバックオフを残す)。
+// ただし maxBackoff は超えさせない。serverRetryAfter がゼロ値なら従来どおり
+// 指数バックオフだけを使う。
+func (c *Cache) markFailedAt(ctx context.Context, e Entry, cause error, serverRetryAfter time.Time) error {
 	attempts := e.Attempts + 1
 	state := StateFailed
 	if attempts >= maxAttempts {
 		state = StateGone
 	}
 	backoff := time.Duration(1<<uint(min(attempts, 8))) * 5 * time.Minute
-	if backoff > 24*time.Hour {
-		backoff = 24 * time.Hour
+	if backoff > maxBackoff {
+		backoff = maxBackoff
+	}
+	retryAt := time.Now().Add(backoff)
+	if serverCap := time.Now().Add(maxBackoff); serverRetryAfter.After(serverCap) {
+		serverRetryAfter = serverCap
+	}
+	if serverRetryAfter.After(retryAt) {
+		retryAt = serverRetryAfter
 	}
 	_, err := c.db.ExecContext(ctx, `
 		UPDATE image_cache
 		   SET state = ?, attempts = ?, last_error = ?, retry_after = ?
 		 WHERE url_hash = ?`,
-		state, attempts, truncErr(cause),
-		time.Now().Add(backoff).UTC().Format(time.RFC3339Nano), e.Hash)
+		state, attempts, truncErr(cause), retryAt.UTC().Format(time.RFC3339Nano), e.Hash)
 	return err
 }
 

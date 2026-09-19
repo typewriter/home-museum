@@ -14,6 +14,8 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
@@ -251,6 +253,13 @@ func (c *Cache) step(ctx context.Context, source string) {
 			c.log.Printf("画像キャッシュ[%s]: id=%d 恒久失敗: %v", source, e.ImageID, err)
 			return
 		}
+		var rl *rateLimitedError
+		if errors.As(err, &rl) && !rl.retryAfter.IsZero() {
+			c.markFailedAt(context.WithoutCancel(ctx), e, err, rl.retryAfter)
+			c.log.Printf("画像キャッシュ[%s]: id=%d 429、%s まで待機: %v",
+				source, e.ImageID, rl.retryAfter.Format(time.RFC3339), err)
+			return
+		}
 		c.markFailed(context.WithoutCancel(ctx), e, err)
 		c.log.Printf("画像キャッシュ[%s]: id=%d 失敗 (%d 回目): %v",
 			source, e.ImageID, e.Attempts+1, err)
@@ -267,6 +276,20 @@ func (p *permanentError) Unwrap() error { return p.err }
 
 func permanent(format string, a ...any) error {
 	return &permanentError{fmt.Errorf(format, a...)}
+}
+
+// rateLimitedError は 429 (Too Many Requests)。retryAfter はサーバーが
+// Retry-After ヘッダーで指定してきた「次に叩いてよい時刻」(ゼロ値 = 指定なし)。
+type rateLimitedError struct {
+	err        error
+	retryAfter time.Time
+}
+
+func (r *rateLimitedError) Error() string { return r.err.Error() }
+func (r *rateLimitedError) Unwrap() error { return r.err }
+
+func rateLimited(retryAfter time.Time, format string, a ...any) error {
+	return &rateLimitedError{err: fmt.Errorf(format, a...), retryAfter: retryAfter}
 }
 
 // fetchOne は 1 枚を 取得 → 変換 → 保管 する。
@@ -318,6 +341,12 @@ func (c *Cache) download(ctx context.Context, e Entry, dst string) error {
 	switch {
 	case resp.StatusCode == http.StatusNotFound, resp.StatusCode == http.StatusGone:
 		return permanent("館が %d を返しました", resp.StatusCode)
+	case resp.StatusCode == http.StatusTooManyRequests:
+		// Wikimedia 等は maxlag/レート制限超過をここで返し、Retry-After で
+		// 「いつまで待てばよいか」を明示してくる。無視して固定間隔で
+		// 叩き直すと制限に礼儀正しく従えないので、指定があれば必ず尊重する。
+		return rateLimited(parseRetryAfter(resp.Header.Get("Retry-After"), time.Now()),
+			"館が 429 (Too Many Requests) を返しました")
 	case resp.StatusCode == http.StatusForbidden, resp.StatusCode == http.StatusUnauthorized:
 		// Cloudflare の Managed Challenge (cf-mitigated: challenge) は
 		// ヘッダーで回避できる問題ではなく (実測: UA/Referer/cf_clearance
@@ -352,6 +381,26 @@ func (c *Cache) download(ctx context.Context, e Entry, dst string) error {
 		return permanent("本文が空です")
 	}
 	return nil
+}
+
+// parseRetryAfter は Retry-After ヘッダー (秒数 or HTTP-date、RFC 9110 §10.2.3)
+// を絶対時刻にする。無い/読めないときはゼロ値 (「サーバー指定なし」の意味で
+// 呼び出し側が既定の指数バックオフにフォールバックする)。
+func parseRetryAfter(v string, now time.Time) time.Time {
+	v = strings.TrimSpace(v)
+	if v == "" {
+		return time.Time{}
+	}
+	if secs, err := strconv.Atoi(v); err == nil {
+		if secs < 0 {
+			return time.Time{}
+		}
+		return now.Add(time.Duration(secs) * time.Second)
+	}
+	if t, err := http.ParseTime(v); err == nil {
+		return t
+	}
+	return time.Time{}
 }
 
 // Stats は運用状況。カバレッジ画面に出す。
