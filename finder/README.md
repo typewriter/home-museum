@@ -159,8 +159,8 @@ export R2_ACCOUNT_ID=... R2_BUCKET=... R2_ACCESS_KEY_ID=... R2_SECRET_ACCESS_KEY
 go run . serve -images r2
 ```
 
-**館へは館ごとに 10 秒に 1 回しか取りに行かない。** 取得したものはリサイズして
-WebP にし (1600px と 400px)、無期限で保管する。
+**館へは館ごとに 10 秒に 1 回しか取りに行かない (AIC だけ 30 秒に 1 回、§3)。**
+取得したものはリサイズして WebP にし (1600px と 400px)、無期限で保管する。
 
 - 保管キーは `sha256(source_url)`。`images.id` を使うと hm.db の再構築で
   全キャッシュが迷子になる (§1)

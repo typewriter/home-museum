@@ -98,7 +98,8 @@ func New(ctx context.Context, o Options) (*Cache, error) {
 }
 
 func (c *Cache) Describe() string {
-	return fmt.Sprintf("%s / 館ごと %s に 1 回 / 幅 %v", c.store.Describe(), c.iv, c.widths)
+	return fmt.Sprintf("%s / 館ごと %s に 1 回 (aic は %s) / 幅 %v",
+		c.store.Describe(), c.iv, c.intervalFor("aic"), c.widths)
 }
 
 func (c *Cache) Close() error {
@@ -157,7 +158,7 @@ func (c *Cache) status(ctx context.Context, e Entry) (Status, error) {
 			return st, err
 		}
 		st.Ahead = n
-		st.ETASec = int((time.Duration(n) * c.iv).Seconds())
+		st.ETASec = int((time.Duration(n) * c.intervalFor(e.Source)).Seconds())
 	}
 	return st, nil
 }
@@ -211,6 +212,22 @@ func (c *Cache) Run(ctx context.Context) {
 	}
 }
 
+// minInterval は既定間隔 (c.iv, 通常 10s) では足りない館だけを載せる下限。
+var minInterval = map[string]time.Duration{
+	// AIC は 2025-12 に IIIF サーバーへの過負荷を機に Cloudflare の動的チャレンジを
+	// 入れており (github art-institute-of-chicago/data-aggregator#151)、10 秒間隔
+	// でも再びトリガーしうる。個別に間隔を伸ばして再発の確率を下げる。
+	"aic": 30 * time.Second,
+}
+
+// intervalFor は館ごとに実際に使う取得間隔。既定より長い下限があればそちらを使う。
+func (c *Cache) intervalFor(source string) time.Duration {
+	if min, ok := minInterval[source]; ok && min > c.iv {
+		return min
+	}
+	return c.iv
+}
+
 // reserve は「この館をいま叩いてよいか」を判定して枠を取る。
 // レート制限が館ごとである根拠は spec_image_cache.md §3。
 func (c *Cache) reserve(source string, now time.Time) bool {
@@ -219,7 +236,7 @@ func (c *Cache) reserve(source string, now time.Time) bool {
 	if c.inFlight[source] {
 		return false
 	}
-	if last, ok := c.lastRun[source]; ok && now.Sub(last) < c.iv {
+	if last, ok := c.lastRun[source]; ok && now.Sub(last) < c.intervalFor(source) {
 		return false
 	}
 	c.inFlight[source] = true
@@ -348,15 +365,16 @@ func (c *Cache) download(ctx context.Context, e Entry, dst string) error {
 		return rateLimited(parseRetryAfter(resp.Header.Get("Retry-After"), time.Now()),
 			"館が 429 (Too Many Requests) を返しました")
 	case resp.StatusCode == http.StatusForbidden, resp.StatusCode == http.StatusUnauthorized:
-		// Cloudflare の Managed Challenge (cf-mitigated: challenge) は
-		// ヘッダーで回避できる問題ではなく (実測: UA/Referer/cf_clearance
-		// いずれを足しても通らない)、リトライしても無駄なので恒久扱いにする。
-		// AIC は 2025-12 頃に www.artic.edu 全体へこれを導入し、以降ずっと
-		// このまま (github art-institute-of-chicago/data-aggregator#151)。
-		// それ以外の 403 は UA / Referer の問題であることが多いので、恒久扱い
-		// にすると origin.go を直しても復帰できなくなる。一時失敗のままにする。
-		if resp.Header.Get("Cf-Mitigated") != "" {
-			return permanent("Cloudflare のチャレンジで拒否されました (cf-mitigated: %s)", resp.Header.Get("Cf-Mitigated"))
+		// Cloudflare の Managed Challenge (cf-mitigated: challenge) は一時期
+		// ヘッダーでは回避できないと判断し恒久扱いにしていたが、AIC 側の説明
+		// (github art-institute-of-chicago/data-aggregator#151) によれば
+		// IIIF サーバーへの過負荷時にだけ動的に有効化する DDoS 対策で、
+		// UA + Referer を揃えれば平常時は通る (2026-09-20 実測で再確認)。
+		// 恒久扱いにすると負荷が引いた後も二度と取りに行かなくなるので、
+		// 他の 403 と同じ一時失敗として指数バックオフで再試行する。再発を
+		// 避けるため AIC の取得間隔は他館より長めに取ってある (minInterval)。
+		if cm := resp.Header.Get("Cf-Mitigated"); cm != "" {
+			return fmt.Errorf("Cloudflare のチャレンジで拒否されました (cf-mitigated: %s)", cm)
 		}
 		return fmt.Errorf("館が %d を返しました (UA / Referer を確認)", resp.StatusCode)
 	case resp.StatusCode != http.StatusOK:
@@ -444,7 +462,7 @@ func (c *Cache) Stats(ctx context.Context) (*Stats, error) {
 			&st.Gone, &st.Bytes, &total); err != nil {
 			return nil, err
 		}
-		st.ETAText = humanDuration(time.Duration(st.Queued) * c.iv)
+		st.ETAText = humanDuration(time.Duration(st.Queued) * c.intervalFor(st.Source))
 		s.ByState["queued"] += st.Queued
 		s.ByState["ready"] += st.Ready
 		s.ByState["failed"] += st.Failed

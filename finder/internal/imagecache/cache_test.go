@@ -92,7 +92,7 @@ func TestFetchStates(t *testing.T) {
 		{"404 は gone (二度と取りに行かない)", "/missing.jpg", StateGone},
 		{"画像でなければ gone", "/page.html", StateGone},
 		{"5xx は failed (再試行する)", "/boom.jpg", StateFailed},
-		{"cf-mitigated 付き 403 は gone (チャレンジは解けない)", "/challenge.jpg", StateGone},
+		{"cf-mitigated 付き 403 も failed (過負荷が引けば通るかもしれない)", "/challenge.jpg", StateFailed},
 		{"cf-mitigated なし 403 は failed (UA/Referer で直るかもしれない)", "/forbidden.jpg", StateFailed},
 		{"429 は failed (Retry-After に従って再試行する)", "/limited.jpg", StateFailed},
 	}
@@ -229,6 +229,30 @@ func TestGoneIsNotRequeued(t *testing.T) {
 		if s == "s" {
 			t.Fatal("gone の行がキューに戻っています")
 		}
+	}
+}
+
+// AIC は Cloudflare の動的チャレンジ再発を避けるため、既定間隔より長い下限
+// (30s) を使うこと。他の館は既定間隔のままであること。
+func TestAICUsesLongerInterval(t *testing.T) {
+	c := newTestCache(t)
+	if got := c.intervalFor("aic"); got != 30*time.Second {
+		t.Fatalf("intervalFor(aic) = %s, want 30s", got)
+	}
+	if got := c.intervalFor("met"); got != c.iv {
+		t.Fatalf("intervalFor(met) = %s, want %s (既定のまま)", got, c.iv)
+	}
+
+	now := time.Now()
+	if !c.reserve("aic", now) {
+		t.Fatal("初回の reserve が失敗しました")
+	}
+	c.release("aic")
+	if c.reserve("aic", now.Add(10*time.Second)) {
+		t.Fatal("10 秒後の reserve(aic) が通ってしまいました (30 秒空くはず)")
+	}
+	if !c.reserve("aic", now.Add(31*time.Second)) {
+		t.Fatal("31 秒後の reserve(aic) が失敗しました")
 	}
 }
 
