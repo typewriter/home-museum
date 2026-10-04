@@ -1,0 +1,24 @@
+# .dockerignore のパターンは context のルートからの相対で照合される (.gitignore と
+# 違って再帰的には効かない) ので、imagecache/ が internal/imagecache/ を巻き込む
+# 心配は無い。それでも意図を明示するため先頭に / を付けておく。
+
+# DB もキャッシュもイメージには入れない (volume で渡す)。
+/index.db
+/index.db-wal
+/index.db-shm
+/index.db.building*
+/cache.db
+/cache.db-wal
+/cache.db-shm
+/imagecache/
+/localcache/
+
+# ビルド成果物とドキュメント
+/finder
+/*.md
+/Dockerfile
+/docker-compose.yml
+/compose.https.yml
+
+# 環境変数
+.env

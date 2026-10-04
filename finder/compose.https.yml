@@ -1,0 +1,29 @@
+# finder を ../caddy-host (複数サービス共通の Caddy) 経由で HTTPS 公開する
+# ときのオーバーレイ。docker-compose.yml 単体は 127.0.0.1:8081 にしかバインド
+# しないので、これは置き換えではなく追加。
+#
+# Caddy 自体や証明書の設定はここには無い (caddy-host 側)。ここでやるのは
+# finder を caddy-host が作る外部ネットワーク "homemuseum" に参加させて、
+# FINDER_BASE_PATH をパスベースルーティング用に教えるだけ。
+#
+#   cd ../caddy-host && docker compose up -d --build   # 先に立てる (homemuseum を作る)
+#   cd ../finder && DOMAIN=... FINDER_BASE_PATH=/art-finder \
+#     docker compose -f docker-compose.yml -f compose.https.yml up -d --build
+#
+# もしくは .env に FINDER_BASE_PATH を書いておけば docker compose が自動で読む
+# (docker-compose.yml が要求する R2_* もここに同居させてよい)。
+#
+# FINDER_BASE_PATH は caddy-host/Caddyfile の handle と揃えること
+# (既定 /art-finder)。
+
+services:
+  finder:
+    environment:
+      FINDER_BASE_PATH: ${FINDER_BASE_PATH:-/art-finder}
+    networks:
+      - default
+      - homemuseum
+
+networks:
+  homemuseum:
+    external: true

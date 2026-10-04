@@ -12,10 +12,18 @@ cache.db
 cache.db-wal
 cache.db-shm
 
+# docker compose が /var/lib/finder に bind mount する先 (cache.db 一式が入る)
+/cache/
+
 # -images local:<dir> の保管先。ディレクトリ名は任意に指定できるので、
 # 別の名前を使うならここに足すこと (館から取った画像をコミットしないため)。
-#
-# 先頭の / は必須。付けないと internal/imagecache/ (ソース) にもマッチして
-# パッケージごとコミットから消える。
-/imagecache/
 /localcache/
+
+# 環境変数
+.env
+
+# コレクションの作業用 DB。正本は collections/ 以下のテキストのほう
+# (spec_collections.md §6)。`go run . collections export` で書き出すこと。
+collections.db
+collections.db-wal
+collections.db-shm

@@ -1,5 +1,5 @@
 {{define "content"}}
-{{$d := .Data}}
+{{$d := .Data.W}}{{$back := u (printf "/works/%d" $d.ID)}}
 <h1 class="worktitle">
   {{if $d.TitleJa}}{{$d.TitleJa}}<span class="orig">{{orElse "(無題)" $d.Title}}</span>
   {{else}}{{orElse "(無題)" $d.Title}}{{end}}
@@ -12,9 +12,31 @@
   {{if $d.ImageURL}}<a class="ext" href="{{$d.ImageURL}}" target="_blank" rel="noopener">画像 URL</a>{{end}}
 </p>
 
+{{with .Data.Flash}}<p class="banner note">{{.}}</p>{{end}}
+
+{{if $.HasCollections}}
+<p class="meta collections">
+  <span class="muted">コレクション</span>
+  {{range .Data.In}}
+    <span class="pill">
+      <a href="{{u "/collections"}}/{{.Slug}}">{{.Title}}</a>
+      <form method="post" action="{{u "/collections/remove"}}" class="inline">
+        <input type="hidden" name="collection_id" value="{{.ID}}">
+        <input type="hidden" name="url" value="{{$d.SourceURL}}">
+        <input type="hidden" name="back" value="{{$back}}">
+        <button class="linkish" title="外す">×</button>
+      </form>
+    </span>
+  {{else}}
+    <span class="muted">— どこにも入っていません</span>
+  {{end}}
+  {{template "addto" dict "Cols" $.Collections "URL" $d.SourceURL "Back" $back}}
+</p>
+{{end}}
+
 {{if and $.Images $d.ImageURL}}
 <section class="preview">
-  <img src="/img/{{$d.ID}}/1600" alt="{{orElse "(無題)" $d.Title}}"
+  <img src="{{u "/img"}}/{{$d.ID}}/1600" alt="{{orElse "(無題)" $d.Title}}"
        data-image-id="{{$d.ID}}" data-width="1600" loading="lazy">
   <p class="muted imgnote" data-for="{{$d.ID}}">
     館の原本を取得してリサイズ・WebP 化したものです。未取得の場合は順番待ちの絵が出ます。
@@ -32,7 +54,7 @@
   {{template "table" $d.Artists}}
   {{if $d.People}}
   <p class="people">名寄せ先:
-    {{range $d.People}}<a class="pill" href="/artists/detail?key={{.PersonKey}}">{{.DisplayName}}
+    {{range $d.People}}<a class="pill" href="{{u "/artists/detail"}}?key={{.PersonKey}}">{{.DisplayName}}
       <code>{{.PersonKey}}</code></a>{{end}}
   </p>
   {{end}}
