@@ -255,12 +255,8 @@ func (c *Cache) markFailed(ctx context.Context, e Entry, cause error) error {
 // 返す相手 (誤設定・悪意のいずれでも) に対して failed のまま無期限に固着しうる。
 const maxBackoff = 24 * time.Hour
 
-// markFailedAt は markFailed と同じだが、サーバーが Retry-After で明示してきた
-// 次回再試行時刻 (serverRetryAfter) を考慮する。指数バックオフより遅ければ
-// そちらを優先し (礼儀として要求を尊重する)、早ければ無視する
-// (極端に短い指定で叩き過ぎないための下限として既存のバックオフを残す)。
-// ただし maxBackoff は超えさせない。serverRetryAfter がゼロ値なら従来どおり
-// 指数バックオフだけを使う。
+// markFailedAt は Retry-After の指定 (serverRetryAfter、ゼロ値なら指定なし) と
+// 指数バックオフの遅いほうを採る。理由は spec_image_cache.md §3。
 func (c *Cache) markFailedAt(ctx context.Context, e Entry, cause error, serverRetryAfter time.Time) error {
 	attempts := e.Attempts + 1
 	state := StateFailed

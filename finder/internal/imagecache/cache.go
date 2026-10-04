@@ -214,9 +214,7 @@ func (c *Cache) Run(ctx context.Context) {
 
 // minInterval は既定間隔 (c.iv, 通常 10s) では足りない館だけを載せる下限。
 var minInterval = map[string]time.Duration{
-	// AIC は 2025-12 に IIIF サーバーへの過負荷を機に Cloudflare の動的チャレンジを
-	// 入れており (github art-institute-of-chicago/data-aggregator#151)、10 秒間隔
-	// でも再びトリガーしうる。個別に間隔を伸ばして再発の確率を下げる。
+	// Cloudflare の動的チャレンジを再発させないため (spec_image_cache.md §3)。
 	"aic": 30 * time.Second,
 }
 
@@ -359,20 +357,12 @@ func (c *Cache) download(ctx context.Context, e Entry, dst string) error {
 	case resp.StatusCode == http.StatusNotFound, resp.StatusCode == http.StatusGone:
 		return permanent("館が %d を返しました", resp.StatusCode)
 	case resp.StatusCode == http.StatusTooManyRequests:
-		// Wikimedia 等は maxlag/レート制限超過をここで返し、Retry-After で
-		// 「いつまで待てばよいか」を明示してくる。無視して固定間隔で
-		// 叩き直すと制限に礼儀正しく従えないので、指定があれば必ず尊重する。
+		// Retry-After の指定があれば必ず尊重する (spec_image_cache.md §3)。
 		return rateLimited(parseRetryAfter(resp.Header.Get("Retry-After"), time.Now()),
 			"館が 429 (Too Many Requests) を返しました")
 	case resp.StatusCode == http.StatusForbidden, resp.StatusCode == http.StatusUnauthorized:
-		// Cloudflare の Managed Challenge (cf-mitigated: challenge) は一時期
-		// ヘッダーでは回避できないと判断し恒久扱いにしていたが、AIC 側の説明
-		// (github art-institute-of-chicago/data-aggregator#151) によれば
-		// IIIF サーバーへの過負荷時にだけ動的に有効化する DDoS 対策で、
-		// UA + Referer を揃えれば平常時は通る (2026-09-20 実測で再確認)。
-		// 恒久扱いにすると負荷が引いた後も二度と取りに行かなくなるので、
-		// 他の 403 と同じ一時失敗として指数バックオフで再試行する。再発を
-		// 避けるため AIC の取得間隔は他館より長めに取ってある (minInterval)。
+		// Cloudflare のチャレンジ (cf-mitigated) も gone にせず一時失敗として扱う
+		// (spec_image_cache.md §2)。
 		if cm := resp.Header.Get("Cf-Mitigated"); cm != "" {
 			return fmt.Errorf("Cloudflare のチャレンジで拒否されました (cf-mitigated: %s)", cm)
 		}

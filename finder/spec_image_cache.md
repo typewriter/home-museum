@@ -7,76 +7,48 @@
 
 ## 1. キーは `images.id` ではなく `sha256(source_url)`
 
-`spec_schema.md` §1 は「DB をゼロから作り直したら派生スクリプトを回し直せばよい、
-派生層は数分だから」という判断で `images.id` を派生テーブルのキーにしている。
+`spec_schema.md` §1 は「派生層は数分で作り直せる」という理由で `images.id` を
+派生テーブルのキーにしている。**画像キャッシュにはこれが当てはまらない。** 館ごと
+10 秒では Rijksmuseum だけで 80 日かかり、作り直せない。`images.id` をキーにすると
+hm.db の再構築で全キャッシュが迷子になる。
 
-**画像キャッシュにはこの判断が当てはまらない。** 館ごと 10 秒では Rijksmuseum
-だけで 80 日かかる、数ヶ月かけて溜まる資産であり、作り直せない。`images.id` を
-キーにすると hm.db の再構築で全キャッシュが迷子になる。
-
-自然キーの `source_url` (`schema.sql` で UNIQUE、翻訳 CSV の JOIN キーでもある)
-のハッシュを使う。
-
-```
-img/{source}/{h[0:2]}/{h}/{width}.webp        h = sha256(source_url) の 16 進
-```
-
-2 階層のプレフィックスを切るのは、1 プレフィックスに数十万オブジェクトを
-置かないため。
-
-URL 上は `images.id` を使う (`/img/{id}/{width}`)。サーバーが hm.db を引いて
-`source_url` → ハッシュに変換する。**URL の名前空間と保管の名前空間を分ける**ことで、
-id が変わっても保管側は無傷で済む。
+URL 上は `images.id` を使い (`/img/{id}/{width}`)、サーバーが `source_url` の
+ハッシュに変換する。URL と保管の名前空間を分けておけば、id が変わっても保管側は
+無傷で済む。
 
 ## 2. 失敗も無期限に記録する (ネガティブキャッシュ)
 
 「有効期限は無期限」は成功だけでなく**失敗にも要る**。記録しないと、404 の画像が
-毎回キューに戻り館を延々と叩き続ける。
+毎回キューに戻り館を延々と叩き続ける。404 / 410 / 画像でないものは `gone` にして
+二度と取りに行かない。
 
-| state | 意味 | 再試行 |
-|---|---|---|
-| `queued` | 要求されたが未取得 | — |
-| `fetching` | ワーカーが処理中 | 起動時に `queued` へ戻す (クラッシュ復帰) |
-| `ready` | R2 に載った | しない |
-| `failed` | 一時的な失敗 (5xx、タイムアウト、変換失敗、429) | 指数バックオフ。8 回で `gone`。429 は下記参照 |
-| `gone` | 恒久的な失敗 (404 / 410 / 画像でない) | **しない** |
+### Cloudflare のチャレンジは `gone` にしなかった
 
-Cloudflare のチャレンジ (`cf-mitigated: challenge`) は一時 `gone` 扱いにしていたが、
-AIC 側の説明 (github art-institute-of-chicago/data-aggregator#151) によれば IIIF
-サーバーへの過負荷時にだけ動的に有効化される DDoS 対策で、UA + Referer を揃えれば
-平常時は通る。恒久扱いにすると負荷が引いた後も復帰できないため `failed` に戻した
-(§3 の AIC 専用間隔と対で運用する)。
+AIC の `cf-mitigated: challenge` は、IIIF サーバーへの過負荷時にだけ動的に有効化
+される DDoS 対策で、UA + Referer を揃えれば平常時は通る
+(github art-institute-of-chicago/data-aggregator#151)。`gone` にすると負荷が
+引いた後も復帰できないので、一時失敗として再試行する (§3 の AIC 専用間隔と対)。
 
 ## 3. レート制限は館ごと
 
 負荷は館ごとに独立しているので、館単位で 10 秒空ければ目的を達する。6 館並列で
-実効 6 倍になり、キューが伸びにくい。ワーカーは `Loaders::SOURCES` と同じキーで
-館ごとに 1 本立てる。
+実効 6 倍になり、キューが伸びにくい。
 
-`server/app.rb` の乱数シードが分単位に量子化されていた設計 (同じ分の全クライアントが
-同じ作品を見る) を維持するなら、**新規に必要な画像は視聴者数によらず毎分 1 枚**なので
-10 秒に 1 回は 6 倍の余裕がある。この同期設計を捨てるとレート制限が即座に律速になる。
+`server/app.rb` の同期設計 (同じ分の全クライアントが同じ作品を見る) を維持するなら、
+新規に必要な画像は視聴者数によらず毎分 1 枚なので、10 秒に 1 回でも 6 倍の余裕がある。
 
 ### AIC だけ 30 秒に 1 回
 
-AIC は 2025-12 に IIIF サーバーへの過負荷を機に Cloudflare の動的チャレンジ
-(`cf-mitigated: challenge`) を導入しており、10 秒間隔でも再びトリガーしうる
-(§2)。再発の確率を下げるため `minInterval` (`cache.go`) で AIC だけ下限 30 秒に
-伸ばしてある。
+§2 の動的チャレンジは 10 秒間隔でも再びトリガーしうるので、再発の確率を下げる。
 
 ### 429 は Retry-After を尊重する
 
-館ごと 10 秒間隔の自主規制は「相手が制限を明示してこない」館向けの設計で、
-Wikimedia (Wikidata/Commons) のように 429 と `Retry-After` ヘッダーで明示的に
-「いつまで待て」と返してくる相手には別に対応が要る。実際に importer 側の
-調査中、WDQS への集計クエリで `Retry-After: 13`〜`600` (秒) を実測した。
+10 秒間隔の自主規制は、相手が制限を明示してこない館向けのもの。Wikimedia は 429 と
+`Retry-After` で待ち時間を明示してくる (WDQS で 13〜600 秒を実測)。
 
-`download()` は 429 を専用に扱い、`Retry-After` (秒数 / HTTP-date の両形式、
-RFC 9110 §10.2.3) をパースして「次に叩いてよい絶対時刻」にする。`markFailedAt`
-はこれと既存の指数バックオフを比較し、**大きい方**を `retry_after` に採用する
-(サーバー指定より長く待つのは礼儀に反しないが、短い指定で叩き過ぎるのは避けたい
-ため)。`Retry-After` が無い/読めない 429 は他の一時エラーと同じ既定バックオフに
-フォールバックする。
+指定と指数バックオフの**大きい方**を採る。指定より長く待つのは礼儀に反しないが、
+短い指定に従って叩き過ぎるのは避けたい。上限は指数バックオフと同じ 24 時間にそろえる。
+異常に大きい値を返す相手に、無期限に固着しないため。
 
 ## 4. IIIF には 1600px を要求する (55%)
 
@@ -98,13 +70,8 @@ Rijksmuseum の 1 枚での実測:
 
 残る 4 館 (609,534 件) は原寸を取って自前で縮小する。
 
-館ごとの癖は `origin.go` の 1 箇所に集約する (`loaders.rb` と同じ思想)。
-AIC は `Referer: https://www.artic.edu/` が無いと 403 を返し、HEAD も拒否する。
-
-Wikimedia (`images.image_url` は Commons の `Special:FilePath/<filename>`、
-リダイレクトで原本を指す) は IIIF ではないが、MediaWiki が `?width=` を
-そのまま解釈して縮小版へリダイレクトしてくれるため、IIIF の館と同じ発想で
-`?width=1600` を付けるだけで済む。ライブでの事前確認は不要 (URL の組み立てだけ)。
+Wikimedia は IIIF ではないが、`Special:FilePath` に `?width=` を付けると縮小版へ
+リダイレクトするので、同じ発想で 1600px を要求する。
 
 ## 5. 変換は libvips に外出しする
 
@@ -113,15 +80,7 @@ Wikimedia (`images.image_url` は Commons の `Special:FilePath/<filename>`、
 `chai2010/webp` か `kolesa-team/go-webp` だけで、どちらも finder の
 「cgo なしで `go build` だけ通る」性質を壊す。
 
-CLI に外出しすればこの問題は消える。`vipsthumbnail` を `exec.CommandContext` で
-呼ぶ。
-
-```
-vipsthumbnail IN --size 1600x --export-profile srgb \
-  -o "OUT.webp[Q=80,effort=6,smart_subsample=true,keep=none]"
-```
-
-`cwebp` ではなく libvips を選ぶ理由は **shrink-on-load**。`cwebp` はリサイズ前に
+CLI (`vipsthumbnail`) に外出しすればこの問題は消える。`cwebp` ではなく libvips を選ぶ理由は **shrink-on-load**。`cwebp` はリサイズ前に
 JPEG をフルデコードするため、Paris Musées の 4415×5004 では 66 MB のビットマップを
 展開することになる。libvips は DCT 段階で 1/2・1/4・1/8 に縮めながら読む。
 
@@ -169,7 +128,7 @@ Q=80 で 6 枚の合計:
 | smithsonian | 0.69 MB | 0.52 MB | 24.8% |
 | **計** | **4.48 MB** | **3.18 MB** | **28.9%** |
 
-全 1,361,997 件を 1600px + 400px で持つと **約 0.65 TB** (JPEG なら約 0.9 TB)。
+当時の全 1,361,997 件を 1600px + 400px で持つと **約 0.65 TB** (JPEG なら約 0.9 TB)。
 
 ## 6. Go で WebP を再デコードしてはいけない
 
@@ -205,8 +164,7 @@ Q=80 で 6 枚の合計:
 ## 9. 保管先は差し替えられるようにする
 
 R2 が本番だが、認証情報なしでも動作確認できるよう、ローカルディレクトリに置く
-実装も持つ (`-store local:./imagecache`)。インターフェースは
-`Put` / `Get` / `Stat` の 3 つだけ。
+実装も持つ (`-images local:./imagecache`)。
 
 R2 はローカル専用の finder からはプロキシで読む (egress 無料、Class B のみ)。
 公開アプリを作る段で public バケット + カスタムドメインに切り替え、帯域を

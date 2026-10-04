@@ -35,8 +35,7 @@ var iiifSize = regexp.MustCompile(`/full/(full|max|\d+,|,\d+|!?\d+,\d+)/(\d+)/`)
 
 // OriginURL は実際に館へ取りに行く URL を組み立てる。
 //
-// IIIF の館 (aic / rijksmuseum、全体の 55%) は原寸ではなく必要な幅を要求する。
-// 館の転送量が 58% 減り、生成される WebP もむしろ小さい (spec_image_cache.md §4)。
+// IIIF の館と Wikimedia には原寸ではなく必要な幅を要求する (spec_image_cache.md §4)。
 // 館ごとの癖はこの関数だけに閉じ込める。
 func OriginURL(r Ref, width int) string {
 	if r.ImageURL == "" {
@@ -48,9 +47,7 @@ func OriginURL(r Ref, width int) string {
 			return r.ImageURL[:m[2]] + fmt.Sprintf("%d,", width) + r.ImageURL[m[3]:]
 		}
 	case "wikimedia":
-		// image_url は Special:FilePath (原寸へのリダイレクト)。MediaWiki は
-		// この形に ?width= を付けると縮小版へリダイレクトしてくれるので、
-		// IIIF の館と同じくサムネイルだけ要求して転送量を減らせる。
+		// Special:FilePath に ?width= を付けると、MediaWiki が縮小版へリダイレクトする。
 		sep := "?"
 		if strings.Contains(r.ImageURL, "?") {
 			sep = "&"

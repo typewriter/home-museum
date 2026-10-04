@@ -125,8 +125,6 @@ func TestFetchStates(t *testing.T) {
 }
 
 // 429 の Retry-After が長ければ、既定の指数バックオフより優先されること。
-// (短ければ既定のバックオフのままでよい。「サーバーの指定より長く待つ」のは
-// 礼儀に反しないため、大きい方を採る設計になっている)
 func TestRetryAfterOverridesBackoffWhenLonger(t *testing.T) {
 	c := newTestCache(t)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -162,9 +160,7 @@ func TestRetryAfterOverridesBackoffWhenLonger(t *testing.T) {
 	}
 }
 
-// 429 の Retry-After が極端に大きくても (誤設定や悪意のいずれでも)、指数
-// バックオフと同じ maxBackoff (24h) で頭打ちにすること。ここが無いと、
-// おかしな値を返す相手に対して failed のまま無期限に固着しうる。
+// 429 の Retry-After が極端に大きくても、maxBackoff で頭打ちにすること。
 func TestRetryAfterCappedAtMaxBackoff(t *testing.T) {
 	c := newTestCache(t)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -303,7 +299,6 @@ func TestParseRetryAfter(t *testing.T) {
 	}
 }
 
-// テスト用の小さなヘルパ。
 func timeNow() time.Time { return time.Now() }
 
 func quietLogger(t *testing.T) *log.Logger {
