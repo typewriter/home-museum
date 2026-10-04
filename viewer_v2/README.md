@@ -23,7 +23,8 @@ go run . serve -images local:./imagecache    # 動作確認用 (R2 を使わな�
 go run . serve -images r2                    # R2_ACCOUNT_ID / R2_BUCKET / R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY
 ```
 
-画像キャッシュの設計は [`spec_image_cache.md`](spec_image_cache.md)。
+画像キャッシュの設計は [`spec_image_cache.md`](spec_image_cache.md)、コレクションの設計は
+[`spec_collections.md`](spec_collections.md)。
 
 ## 画面 (web/)
 

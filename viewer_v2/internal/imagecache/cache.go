@@ -441,22 +441,22 @@ func parseRetryAfter(v string, now time.Time) time.Time {
 
 // Stats は運用状況。カバレッジ画面に出す。
 type Stats struct {
-	ByState  map[string]int64
-	BySource []SourceStat
-	Total    int64
-	Bytes    int64
-	Store    string
-	Interval time.Duration
+	ByState  map[string]int64 `json:"by_state"`
+	BySource []SourceStat     `json:"by_source"`
+	Total    int64            `json:"total"`
+	Bytes    int64            `json:"bytes"`
+	Store    string           `json:"store"`
+	Interval time.Duration    `json:"-"`
 }
 
 type SourceStat struct {
-	Source  string
-	Queued  int64
-	Ready   int64
-	Failed  int64
-	Gone    int64
-	Bytes   int64
-	ETAText string
+	Source  string `json:"source"`
+	Queued  int64  `json:"queued"`
+	Ready   int64  `json:"ready"`
+	Failed  int64  `json:"failed"`
+	Gone    int64  `json:"gone"`
+	Bytes   int64  `json:"bytes"`
+	ETAText string `json:"eta"`
 }
 
 func (c *Cache) Stats(ctx context.Context) (*Stats, error) {

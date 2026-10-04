@@ -46,6 +46,7 @@ func New(o Options) *Server {
 	s.mux.HandleFunc("GET /img/{id}/{w}", s.handleImage(imagecache.PriorityVisitor))
 	s.mux.HandleFunc("GET /img/{id}/{w}/status", s.handleImageStatus(imagecache.PriorityVisitor))
 	s.routePublicAPI()
+	s.routeAdminAPI()
 	s.routeSPA()
 	return s
 }
