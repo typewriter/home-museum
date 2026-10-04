@@ -12,7 +12,12 @@ importer/hm.db ──export (ローカル)──▶ works.db ──コピー─�
 ```bash
 go run . export -hm ../importer/hm.db -out works.db
 go run . import -db viewer.db works.db
+
+# finder から移るときに 1 回だけ。R2_* 環境変数が要る
+go run . migrate-cache -db viewer.db -images r2 ../finder/cache.db
 ```
+
+画像キャッシュの設計は [`spec_image_cache.md`](spec_image_cache.md)。
 
 ## viewer.db は 2 層を 1 ファイルに持つ
 

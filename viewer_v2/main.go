@@ -2,6 +2,7 @@
 //
 //	viewer_v2 export  hm.db から works.db を作る (ローカルで実行する)
 //	viewer_v2 import  works.db で viewer.db の取り込み層を入れ替える (サービス停止中に VPS で実行する)
+//	viewer_v2 migrate-cache  finder の cache.db から画像キャッシュの状態を移す
 //
 // 詳細は README.md。
 package main
@@ -17,6 +18,7 @@ import (
 
 	"github.com/typewriter/home-museum/viewer_v2/internal/db"
 	"github.com/typewriter/home-museum/viewer_v2/internal/export"
+	"github.com/typewriter/home-museum/viewer_v2/internal/imagecache"
 )
 
 const usage = `viewer_v2 — home-museum の公開ビューア
@@ -24,6 +26,7 @@ const usage = `viewer_v2 — home-museum の公開ビューア
 使い方:
   viewer_v2 export [-hm ../importer/hm.db] [-out works.db]
   viewer_v2 import [-db viewer.db] works.db
+  viewer_v2 migrate-cache [-db viewer.db] [-images r2] finder/cache.db
 `
 
 func main() {
@@ -42,6 +45,8 @@ func main() {
 		err = runExport(ctx, args)
 	case "import":
 		err = runImport(ctx, args)
+	case "migrate-cache":
+		err = runMigrateCache(ctx, args)
 	default:
 		fmt.Fprint(os.Stderr, usage)
 		os.Exit(2)
@@ -72,6 +77,30 @@ func runImport(ctx context.Context, args []string) error {
 	}
 	defer d.Close()
 	return db.Import(ctx, d, fs.Arg(0), os.Stderr)
+}
+
+func runMigrateCache(ctx context.Context, args []string) error {
+	fs := flag.NewFlagSet("migrate-cache", flag.ExitOnError)
+	dbPath := fs.String("db", env("VIEWER_DB", "viewer.db"), "viewer.db のパス")
+	images := fs.String("images", env("VIEWER_IMAGE_STORE", "r2"),
+		`画像の保管先。"r2" (要 R2_* 環境変数) / "local:<dir>"`)
+	fs.Parse(args)
+	if fs.NArg() != 1 {
+		return fmt.Errorf("finder の cache.db のパスを 1 つ指定してください")
+	}
+	store, err := imagecache.OpenBlob(*images)
+	if err != nil {
+		return err
+	}
+	if store == nil {
+		return fmt.Errorf("-images を指定してください")
+	}
+	d, err := db.Open(ctx, *dbPath)
+	if err != nil {
+		return err
+	}
+	defer d.Close()
+	return imagecache.Migrate(ctx, d.W, store, fs.Arg(0), os.Stderr)
 }
 
 func env(key, def string) string {
