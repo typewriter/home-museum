@@ -183,7 +183,7 @@ select coalesce(t.text, i.title) as title,
 
 ## 注意点
 
-- `*.lmdb/` と `*.db` はリポジトリに含めない (`.gitignore` 済み)。翻訳 CSV (`titles_ja_*.csv`) は成果物なのでコミットする
+- `*.lmdb/` と `*.db` はリポジトリに含めない (`.gitignore` 済み)。LLM の成果物 (`with_llms/titles_ja_*.csv`、`author_merges.csv`) も作り直せない正本だが、ローカルに置いて追跡しない。消さないこと
 - `sqlite3` gem は 2.x。`execute` へのバインド変数は可変長引数ではなく**配列**で渡す
 - SQLite では二重引用符は文字列ではなく**識別子**を意味する。`where method = "source"` は `images.source` 列との比較になってしまうので、文字列リテラルには単一引用符を使う
 - 名寄せ (同一人物の統合) は未実装。作者名の日本語訳はエントリ単位なので、名寄せ無しでも表示は成立する

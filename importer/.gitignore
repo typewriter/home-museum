@@ -81,3 +81,12 @@ with_llms/*_prompt.md
 with_llms/*/prompt.md
 with_llms/title_translator/title_translator
 with_llms/author_merger/author_merger
+# title_translator の -out の既定値 (翻訳結果JSONの置き場。CSV に追記した後は捨ててよい)
+with_llms/scratch/
+
+# LLM による名寄せ判定の正本。titles_ja_*.csv と同じくローカルに置き、追跡しない
+author_merges.csv
+
+# 使い捨ての作業ファイル (検証スクリプト、CSV に追記済みの翻訳結果JSON)
+scratch/
+translations-*.json
