@@ -63,6 +63,11 @@ class TitleTranslationBatch
         next if !url || seen[url]
         seen[url] = true
 
+        # 原題を持たないレコードは翻訳しようがない (Wikimedia は Wikidata の
+        # ラベルが全言語で欠けている作品が6%ほどある)。ここで落とさないと
+        # next が毎回それを先頭から返し、翻訳不能な行が溜まって進まなくなる。
+        next if record[:title].to_s.strip.empty?
+
         f.puts JSON.generate(FIELDS.to_h { |k| [k, record[k]] })
         count += 1
       }
@@ -100,9 +105,21 @@ class TitleTranslationBatch
     store&.close
   end
 
+  # next/append はこの後に status も呼ぶので、1 プロセス内では一度だけ読む。
+  #
+  # CSV.read で全列をパースすると 12 万行で 7 秒かかり、バッチ1回ごとに
+  # 2度払うことになる。欲しいのは source_url だけで、それは常に
+  # 「ラベル,URL,」の形で行頭に来るので行単位の正規表現で拾う。原題に
+  # 改行を含む行の継続行はラベルで始まらないので拾われない。
   def translated_urls
-    return {} if !File.exist?(@csv_path)
-    CSV.read(@csv_path, headers: true).each_with_object({}) { |row, h| h[row["source_url"]] = true }
+    @translated_urls ||= begin
+      prefix = /\A#{Regexp.escape(CSV.generate_line([@label], row_sep: ''))},([^,"\r\n]+),/
+      urls = {}
+      if File.exist?(@csv_path)
+        File.foreach(@csv_path) { |line| (m = prefix.match(line)) and urls[m[1]] = true }
+      end
+      urls
+    end
   end
 
   def status
@@ -155,6 +172,7 @@ class TitleTranslationBatch
       csv << HEADER if !exists
       rows.each { |row| csv << row }
     }
+    rows.each { |row| done[row[1]] = true } # 後続の status にも反映させる
     rows.size
   end
 end
