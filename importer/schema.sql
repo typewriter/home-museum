@@ -56,7 +56,7 @@ CREATE TABLE IF NOT EXISTS image_artists (
   role_bucket            TEXT,           -- ← normalize_artists.rb が埋める派生列
   -- ↓ normalize_person.rb が埋める派生列。docs/spec_normalization.md
   person_key             TEXT,           -- 名寄せ先 ('ulan:500031075' | 'cluster:aic|27558')。FK ではない
-  match_method           TEXT,           -- 発火したルール (authority_id / name_exact / llm …)
+  match_method           TEXT,           -- 発火したルール (authority_id / name_exact …)
   match_confidence       TEXT,           -- high | medium | low
   match_reason           TEXT,           -- 自由記述。手法ごとに書ける内容が違ってよい
   UNIQUE (image_id, position)
@@ -93,9 +93,7 @@ CREATE TABLE IF NOT EXISTS image_translations (
   PRIMARY KEY (image_id, field, lang)
 );
 
--- 名寄せした人物。主キーは autoincrement ではなく person_key (外部の典拠ID、または
--- クラスタの代表メンバーから決定的に導いた値) なので、再実行すれば同じキーになる。
--- 人物単位でぶら下がるものが無いため、丸ごと作り直してよい。spec_schema.md §4
+-- 名寄せした人物。丸ごと作り直してよい。spec_schema.md §4
 CREATE TABLE IF NOT EXISTS artists (
   person_key   TEXT PRIMARY KEY,
   display_name TEXT NOT NULL,   -- 役割接頭辞を除いた表記の最頻値。spec_schema.md §5

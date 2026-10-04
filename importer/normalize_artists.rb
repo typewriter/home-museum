@@ -5,9 +5,7 @@
 #   ruby normalize_artists.rb            全件
 #   ruby normalize_artists.rb cleveland  ソース指定
 #
-# Smithsonian の freetext.name[] には Sitter (肖像画のモデル) や Patron が
-# 混ざっており、そのまま作者として扱うと「制作者ではない人物が artist として
-# 表示される」。role_raw / qualifier_raw をバケットに分類して切り分ける。
+# 作者欄には Sitter (肖像画のモデル) や Patron も混ざっているので、制作者と切り分ける。
 #
 # バケット:
 #   creator            制作者 (確度高)
@@ -16,13 +14,6 @@
 #   non_creator        制作に関与していない (sitter / patron / owner …)
 #   unknown            役割はあるが、どのバケットにも判別できなかった
 #   NULL               そもそも役割情報が無いソース (Rijksmuseum, AIC)
-#
-# NULL と unknown を分けているのは、「判定材料が無い」と「材料はあるが語彙に
-# 無い」を区別するため。以前はどちらも creator を既定値にしていたため、
-# 判定結果としての creator と混ざって区別できなくなっていた。
-#
-# 名寄せ (同一人物の統合) はここではやらない。日本語名は image_artist_names が
-# エントリ単位で持つので、名寄せ無しでも表示は成立する。
 
 require_relative "db"
 require_relative "loaders"
@@ -33,7 +24,6 @@ NON_CREATOR = /\b(sitter|patron|dedicat\w*|collector|client|commission\w*|owner|
 UNCERTAIN   = /\b(attribut\w*|possibl\w*|probabl\w*|circle of|follower of|school of|workshop of|style of|manner of|ascribed)\b/
 AFTER       = /\b(after|copy after|cast after|derived from|d'après|d'apres)\b/
 
-# creator は積極判定にする。ここに無い役割は creator ではなく unknown に落ちる。
 # 語彙が館ごとに違う (Cleveland は "printed by" のような句、Paris Musées は仏語)
 # ため、単語境界は使わず部分一致で拾う。NON_CREATOR/AFTER/UNCERTAIN を先に
 # 見るので、"Person in Photograph" が photograph で creator になることはない。
@@ -73,8 +63,7 @@ def bucket(role_raw, qualifier_raw)
   role = role_raw.to_s.downcase
   qualifier = qualifier_raw.to_s.downcase
 
-  # 役割情報を持たないソース。creator を既定値にすると「判定した creator」と
-  # 区別が付かなくなるので、判定しなかったことを NULL で残す
+  # creator を既定値にしない理由は docs/spec_normalization.md
   return nil if role.empty? && qualifier.empty?
 
   # Cleveland は確度を role ではなく qualifier に持つので先に見る

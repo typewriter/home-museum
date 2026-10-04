@@ -1,25 +1,14 @@
 #!/usr/bin/env ruby
 
-# image_artists の person_key / match_method / match_confidence / match_reason と
-# artists テーブルを埋める。設計判断は docs/spec_normalization.md
-# の「作者の名寄せ」。
+# image_artists の person_key ほか3列と artists テーブルを埋める (作者の名寄せ)。
+# 設計判断は docs/spec_normalization.md の「作者の名寄せ」。
 #
 #   ruby normalize_person.rb
 #
-# 段階1..6 を順に適用する。
+#   段階 1 典拠ID / 2 名前完全一致→典拠 / 3 同一ソース内の同名別ID
+#        4 生没年のパース (統合ではなく検証材料) / 5 ソース間の同名 / 6 区切りの違い
 #
-#   1 典拠ID / 2 名前完全一致→典拠 / 3 同一ソース内の同名別ID
-#   4 生没年のパース (統合ではなく検証基盤) / 5 ソース間の同名 / 6 区切りの違い
-#
-# 段階6以降で保留にしている手法 (first+last / 編集距離) を足すときは、段階6の下に
-# もう1つ merge_by を足して match_method の値を増やすだけでよく、スキーマは変わらない。
-#
-# 統合の判断は非対称にしてある:
-#   生没年が一致   → 統合し high      (裏が取れた)
-#   生没年が無い   → 統合し medium    (裏が取れていないだけで、否定材料も無い)
-#   生没年が不一致 → 統合しない       (別人の可能性がある)
-# 「見逃しより誤統合のほうがコストが高い」ためで、不一致は「別人と確定」ではなく
-# 「確信が持てないので保留」を意味する。
+# role_bucket が non_creator の行を母数から外すので、normalize_artists.rb の後に回す。
 
 require "json"
 require "set"
@@ -50,13 +39,8 @@ end
 # Smithsonian と AIC は生没年を構造化して持たず、自由記述に埋め込んでいる。
 # ここで取り出さないと、この2ソースは検証材料が無く medium 止まりになる。
 #
-# 生没年**ではない**年が同じ書式で混ざっているのが厄介なところ:
-#   "born England, active 1775-1806"    活動期間 (生没年ではない)
-#   "active 1842 - 1868"                同上
-#   "Baccarat Glassworks … founded 1764" 設立年
-#   "French, 19th century"              世紀表記
-# これらを拾うと、生没年ゲートが偽の確証を与える側に回る。活動期間を示す語が混じる
-# 文字列は丸ごと捨てる (保守的に倒す)。
+# 活動期間 ("active 1775-1806") や設立年 ("founded 1764") が同じ書式で混ざるので、
+# それらを示す語を含む文字列は丸ごと捨てる。
 LIFE_REJECT = /\b(active|fl\.?|flourished|founded|found\.|established|est\.|reign\w*)\b/i
 
 DASHES = "–—‒−‐"
@@ -177,21 +161,8 @@ end
 
 Match = Struct.new(:method, :confidence, :reason)
 
-# 生没年の一致判定。:verified / :near / :conflict / :unknown を返す。
-#
-# 2点、当初の設計から変えている。
-#
-# 1. 片側が複数の年を持つとき、代表値1つを選んで比べると偽の不一致が出る。
-#    Smithsonian の Thomas Doughty は館の中で生年が 1793 と 1791 に割れており、
-#    最小値を採ると Cleveland の 1793 と食い違って却下されていた。集合として
-#    比べ、どれか1つでも合えば一致とみなす。
-# 2. 完全一致だけを採ると、同一人物の生没年が館ごとに1〜3年ぶれている分が
-#    すべて却下される。display_name が完全一致するクラスタ 848組のうち 402組が
-#    ±3年に収まっており、標本22件はすべて同一人物だった (Volaire 1799/1802、
-#    Valck 1651/1652、Bargue 1825/1826 等)。名前が完全一致しているという強い
-#    根拠があるので、YEAR_TOLERANCE の範囲は一致として扱う。
-#    spec の false-merge 危険例 (Hiller 父子29年差、Campbell 26年差、Brown 38年差)
-#    はいずれもこの幅では触れない。
+# 生没年の一致判定。代表値ではなく集合どうしで比べ、YEAR_TOLERANCE 年以内は
+# 一致とみなす (どちらも理由は docs/spec_normalization.md)。
 YEAR_TOLERANCE = 3
 
 def compare_set(xs, ys)
@@ -220,10 +191,8 @@ end
 def placeholder_year?(person, placeholder_pairs)
   return true if placeholder_pairs.include?([person.source, *person.year_pair])
 
-  # Met は活動期を「ちょうど100年幅」で生没年欄に入れている (1800-1900 等)。
-  # コホート検出は完全一致の組しか数えないので、許容幅を入れると 1800-1900 と
-  # 1802-1900 のような推定値同士が近傍ですり抜ける。span が厳密に100年のものは
-  # 伝記情報とみなさない。
+  # Met が生没年欄に入れる活動期 (1800-1900 等)。コホート検出は完全一致しか
+  # 数えないので、YEAR_TOLERANCE の近傍 (1802-1900) がすり抜けないよう別に弾く。
   person.births.any? { |birth| person.deaths.any? { |death| death - birth == 100 } }
 end
 
@@ -272,10 +241,8 @@ def load_people(db)
     person.names[core] += count
   }
 
-  # 人物のキーは「最も多く使われた表記」から決める。最初に読んだ行で決めると、
-  # met の "After designs by Alexandre Laemlein" のような外れ値が先に来たときに
-  # キーが汚染され、同じ人物の他ソースと一致しなくなる (display_name は最頻値を
-  # 採るので表示は正しく見えてしまい、気づきにくい)。
+  # 人物のキーは最頻の表記から決める。最初に読んだ行で決めると、"After designs by …"
+  # のような外れ値が先に来たときに他ソースの同一人物と一致しなくなる。
   # 名前をキーにしている人物 (from_id が偽) は key がそのまま pid なので触らない。
   people.each_value { |person|
     person.authorities.uniq!
@@ -429,7 +396,7 @@ def merge_people(people, placeholder_pairs)
 end
 
 # クラスタごとの person_key を決める。典拠IDがあればその代表、無ければメンバーから
-# 決定的に選んだアンカー。連番を使わないので、再実行しても同じキーになる。
+# 決定的に選んだアンカー。
 def person_keys(people, uf)
   keys = {}
 
@@ -500,9 +467,7 @@ def write_back(db, people, keys, matches)
 end
 
 def rebuild_artists(db, people, keys)
-  # display_name はクラスタ内で最も多く使われた「役割接頭辞を除いた表記」。
-  # 素朴に name_raw の最頻を採ると Met の "After Titian (Tiziano Vecellio)" が
-  # 代表になってしまう (spec_schema.md §5)。
+  # display_name は役割接頭辞を除いた表記の最頻値 (spec_schema.md §5)。
   names = Hash.new { |h, k| h[k] = Hash.new(0) }
   births = Hash.new { |h, k| h[k] = Hash.new(0) }
   deaths = Hash.new { |h, k| h[k] = Hash.new(0) }

@@ -1,5 +1,5 @@
 # 作者名の正規化。normalize_person.rb が使う。
-# 判断の根拠 (なぜソースごとに括弧の扱いを変えるか等) は docs/spec_normalization.md。
+# 判断の根拠は docs/spec_normalization.md。
 
 module AuthorNames
   # 典拠の代表を選ぶ優先順位。ULAN を先頭にしているのは美術分野で最も網羅的なため。
@@ -37,10 +37,8 @@ module AuthorNames
     adapted\s+from | \(\?\) | \?
   )\s*/xi
 
-  # Met は役割をコロンで前置することがある ("Watchmaker: Vaucher Fréres")。
-  # コロンの前を無条件に剥がすと "Le Caricaturiste :" (新聞名) や
-  # "Attributed to the Class N: The Cook Class of Head Vases" のように
-  # 名前そのものが消えるので、役割語を列挙して限定する。
+  # Met の "Watchmaker: Vaucher Fréres"。コロンの前を無条件に剥がすと
+  # "Le Caricaturiste :" (新聞名) のように名前そのものが消えるので、役割語を列挙する。
   COLON_ROLE = /\A(
     medalist | watchmaker | clockmaker | case\s+maker | gilder | designer |
     printer | silversmith | goldsmith | engraver | jeweler | enameler |
@@ -55,8 +53,7 @@ module AuthorNames
   YEAR_COHORT_MIN = 20
   SENTINEL_YEARS = [0, 9999].freeze
 
-  # 同名グループがこれを超えたら総当たりせず諦める。段階5/6 は名前だけが根拠なので、
-  # 巨大なグループは中身が信用できない (総当たりが O(n^2) になる問題も避ける)。
+  # 名前だけを根拠にする段階で、同名グループがこれを超えたら諦める。
   MAX_GROUP = 200
 
   def strip_role_prefix(name)
@@ -70,10 +67,8 @@ module AuthorNames
     current
   end
 
-  # 表示・照合に使う中核部分を取り出す。括弧の扱いがソースごとに違う点に注意:
-  # Cleveland/AIC の "(American, 1863–1937)" は国籍と生没年なので落としてよいが、
-  # Rijksmuseum の "(II)" "(1612-1695)" "(schrijver)" は館が同名の別人を区別する
-  # ために付けた識別子なので、落とすと Utamaro と二代目 Utamaro が融合する。
+  # 表示・照合に使う中核部分を取り出す。括弧を落とすかどうかはソースごとに違う
+  # (docs/spec_normalization.md「括弧の扱いをソースごとに変えた」)。
   def name_core(raw, source)
     name = strip_role_prefix(raw)
 
@@ -85,11 +80,8 @@ module AuthorNames
       name = name.sub(/\s*\(.*\z/m, "")
       name = split_at_comma(name)&.first || name
     when "parismusees"
-      # "Morisseau, Eugène" → "Eugène Morisseau"。括弧は Rijksmuseum と同じく
-      # 識別子・補足 ("(dessinateur)" "(l'Aîné)" "(Paris)") なので落とさないが、
-      # 姓名を入れ替えるときは末尾に残す。そうしないと
-      # "Atget, Eugène (Jean Eugène Auguste Atget, dit)" が
-      # "Eugène (Jean … dit) Atget" のように名前の途中に括弧が挟まる
+      # "Morisseau, Eugène" → "Eugène Morisseau"。括弧は落とさず末尾に残す。
+      # そうしないと "Atget, Eugène (…, dit)" が "Eugène (…, dit) Atget" になる
       suffix = ""
       if (open = trailing_paren_at(name))
         suffix = " #{name[open..]}"
@@ -107,9 +99,6 @@ module AuthorNames
     name.strip
   end
 
-  # 括弧の外にある最初のカンマで2つに割る。無ければ nil。
-  # Paris Musées の "姓, 名" 形式には "Aubert (Imprimeur, lithographe, éditeur)" の
-  # ように括弧内にカンマを持つものがあり、素朴に split(",") すると名前が壊れる。
   def trailing_paren_at(name)
     return nil if !name.end_with?(")")
 
@@ -125,6 +114,8 @@ module AuthorNames
     nil
   end
 
+  # 括弧の外にある最初のカンマで2つに割る。無ければ nil。括弧内にカンマを持つ名前
+  # ("Aubert (Imprimeur, lithographe, éditeur)") があるので split(",") にしない。
   def split_at_comma(name)
     depth = 0
     name.each_char.with_index { |char, i|

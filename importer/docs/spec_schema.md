@@ -64,37 +64,15 @@ Paris Musées 7.4倍、Smithsonian 3.8倍)。これは**スキーマではなく
 
 ### 4. 名寄せ (`artists`) の主キーは autoincrement ではなく `person_key`
 
-名寄せは日本語名の前提ではなくなったので、用途は「作者軸で作品を横断的に集める」
-ことだけ。ただし**作者一覧を出すのは必須要件**なので、クラスタの代表表記を置く場所が
-要る。`artists` は作る。
-
-```sql
-CREATE TABLE artists (
-  person_key   TEXT PRIMARY KEY,   -- 'ulan:500031075' | 'cluster:aic|27558'
-  display_name TEXT NOT NULL,
-  birth_year   INTEGER,
-  death_year   INTEGER,
-  image_count  INTEGER NOT NULL
-);
-```
-
-当初は「導入すると `artists` だけ派生層から外れる (id を持ち続ける必要があるため
-`DELETE; INSERT` ができなくなる)」を最大の代償として後回しにしていたが、これは
-**autoincrement の `id` を主キーにした場合の話**だった。`person_key` を自然キーに
-すれば起きない。
-
-- エントリの約6割を占める `ulan:` / `wd:` は**外部で安定した識別子**で、名寄せ
-  ルールを改良しても値が変わらない
-- `cluster:` 側も連番ではなく中身から決定的に導く (`spec_normalization.md`
-  「`person_key` を連番にしなかった」)。同じルールで再実行すれば必ず同じキーになる
-
-人物単位でぶら下がるものが無い (§3 の決定どおり日本語名はエントリ単位の
-`image_artist_names` に置く) ので、`artists` は `image_dates` と同じ普通の派生
-テーブルとして扱える。
+作者一覧には、クラスタの代表表記を置く場所が要る。autoincrement の `id` を主キーに
+すると、名寄せルールを直すたびに id を保ったままの差分適用が要り、`artists` だけが
+派生層から外れる。`person_key` は中身から決定的に導くので (エントリの約6割は
+`ulan:` / `wd:` の外部 ID)、`DELETE; INSERT` で作り直せる。人物単位でぶら下がるものも
+無い (§3)。
 
 ### 5. `display_name` は「役割接頭辞を除いてから最頻」
 
-素朴に最頻の `name_raw` を採ると作者一覧が壊れる。ティツィアーノのクラスタでの実測:
+素朴に最頻の `name_raw` を採ると、ティツィアーノのクラスタではこうなる:
 
 ```
 After Titian (Tiziano Vecellio)   28   ← 最頻。これが一覧に並んでしまう
@@ -110,31 +88,8 @@ Met 側が `Titian (Tiziano Vecellio)` に寄り、38対28 で `Titiaan` に勝�
 ### 6. 信頼度は `artists` ではなく `image_artists` 側に持つ
 
 作者一覧を信頼度で絞るときは `image_artists.match_confidence` を JOIN して使う。
-`artists` に信頼度を持たせないので、精度の低い手法 (LLM 等) を後から足しても
-`artists` の定義を変えずに済む。JOIN を毎回書くのが面倒になったら
-`artists.min_confidence` を `ALTER TABLE` で足せばよい (派生テーブルなので追加
-コストは再生成の数分だけ)。
-
-## 作業手順
-
-```bash
-ruby loader.rb                       # LMDB → images, image_artists (全ソース)
-ruby normalize_dates.rb              # → image_dates
-ruby normalize_artists.rb            # → image_artists.role_bucket
-ruby apply_translations.rb seed      # 館が持つ原語表記 → image_artist_names
-ruby apply_translations.rb titles    # titles_ja_*.csv → image_translations
-ruby apply_translations.rb artists   # artist_names_ja_*.csv → image_artist_names
-ruby apply_translations.rb stale     # 原文が変わった訳を検出
-ruby normalize_person.rb             # → artists, image_artists.person_key ほか
-```
-
-後半4つは互いに独立で順不同。`loader.rb` の後に回せばよい。
-
-`normalize_person.rb` だけは `normalize_artists.rb` の後に置く。名寄せの母数を
-決めるのに `role_bucket` を見るため。
-
-`seed` と `artists` の順序だけは意味がある: 館が持つ原語表記 (`method='source'`) は
-LLM 訳より信頼できるので、`artists` は `method='source'` の行を上書きしない。
+`artists` に信頼度を持たせないので、精度の低い手法を後から足しても
+`artists` の定義を変えずに済む。
 
 ## 鮮度検知
 
