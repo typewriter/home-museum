@@ -1,7 +1,7 @@
 require 'net/http'
 require 'uri'
 require 'json'
-require_relative 'kv_store'
+require_relative '../kv_store'
 require 'time'
 
 module Met
