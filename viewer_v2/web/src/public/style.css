@@ -524,10 +524,33 @@ button {
   color: var(--room-ink);
 }
 
+/*
+ * 1 画面 (100svh) にヘッダー・作品・作品名だけを収める。作品名が長くて折り返しても、
+ * 縮むのは作品の側にする。作品名が画面の下端で半分だけ見切れないように。
+ * 素材や寸法などのキャプションは、その下にスクロールして読む。
+ */
+.room-stage {
+  height: 100vh;
+  height: 100svh;
+  display: flex;
+  flex-direction: column;
+}
+
+.room-title {
+  flex: none;
+  width: 100%;
+  max-width: 720px;
+  margin: 0 auto;
+  padding: var(--s4) var(--gutter) var(--s3);
+  font-size: var(--fs-xl);
+  font-weight: 500;
+  line-height: 1.45;
+}
+
 .room-wall {
   position: relative;
-  height: calc(100vh - 120px);
-  min-height: 320px;
+  flex: 1;
+  min-height: 0;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -573,17 +596,10 @@ button {
 .caption {
   max-width: 720px;
   margin: 0 auto;
-  padding: var(--s5) var(--gutter) var(--s7);
-}
-
-.caption-title {
-  font-size: var(--fs-xl);
-  font-weight: 500;
-  line-height: 1.45;
+  padding: 0 var(--gutter) var(--s7);
 }
 
 .caption-original {
-  margin-top: var(--s1);
   color: var(--room-ink-2);
 }
 
@@ -637,8 +653,11 @@ button {
 }
 
 @media (max-width: 760px) {
-  .room-wall {
+  .room-stage {
     height: auto;
+  }
+  .room-wall {
+    flex: none;
     min-height: 240px;
     padding: 0;
   }

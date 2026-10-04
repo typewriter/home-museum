@@ -69,6 +69,7 @@ export function Room({ kind, exKey, n }: Props) {
 
   return (
     <div className="room" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
+      <div className="room-stage">
       <header className="room-bar">
         <button className="room-exit" onClick={exit}>
           ← {data?.exhibition.title ?? ""}
@@ -98,6 +99,8 @@ export function Room({ kind, exKey, n }: Props) {
           </button>
         )}
       </div>
+      {data && <h1 className="room-title">{displayTitle(data.room.work)}</h1>}
+      </div>
 
       {data && <Caption work={data.room.work} />}
       {st.status === "error" && <p className="caption muted">読み込めませんでした。</p>}
@@ -114,7 +117,6 @@ function Caption({ work: w }: { work: Work }) {
   return (
     <section className="caption">
       <div className="caption-head">
-        <h1 className="caption-title">{displayTitle(w)}</h1>
         {w.title_ja && w.title && <p className="caption-original">{w.title}</p>}
         <p className="caption-artist">{[w.artist, w.date].filter(Boolean).join("、")}</p>
       </div>
