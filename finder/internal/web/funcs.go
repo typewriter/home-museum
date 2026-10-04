@@ -22,8 +22,8 @@ var funcs = template.FuncMap{
 	"argPairs": argPairs,
 }
 
-// comma は 1361997 を "1,361,997" にする。件数が桁で読めないと点検に使えない。
-// テンプレートからは int / int64 の両方が来るので any で受ける。
+// comma は 1361997 を "1,361,997" にする。テンプレートからは int / int64 の両方が
+// 来るので any で受ける。
 func comma(v any) string {
 	var n int64
 	switch x := v.(type) {

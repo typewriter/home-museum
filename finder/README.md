@@ -43,25 +43,13 @@ finder/index.db ──(mode=ro / ATTACH)──┘
    finder index   (hm.db を読んで作り直す。いつ捨ててもよい)
 ```
 
-`index.db` は `.gitignore` 済み。
-
-### index.db の中身
-
-| テーブル | 内容 |
-|---|---|
-| `image_meta` | 解決済みの制作年 (`image_dates` 優先、無ければ `date_raw_*`)、訳の有無、作者数・名寄せ済み人数 |
-| `search` | 欧文の FTS5。`title` / `artist` / `description` / `terms` (style・category・medium・origin・credit・date テキスト) |
-| `search_ja` | 日本語の FTS5。訳題と作者の日本語名 |
-| `facet` | 絞り込みの選択肢と件数 (source / style / category 上位 500 / date_precision / year_kind / role_bucket) |
-| `meta` | 作成時刻と、作成時点の `images` 件数・`max(updated_at)` — 鮮度判定に使う |
-
 ## 検索の仕組み
 
 **欧文と日本語で索引を分けている。** `unicode61` トークナイザは CJK を 1 語として
 切ってしまい「聖母子」の中の「聖母」を引けないため、日本語は `trigram` で別に張る。
 
-- 欧文は `unicode61 remove_diacritics 2`。**`Cezanne` で `Cézanne` に当たる**
-  (どちらも 110 件)。語は前方一致 (`"monet"*`) で扱う
+- 欧文は `unicode61 remove_diacritics 2`。**`Cezanne` で `Cézanne` に当たる**。
+  語は前方一致 (`"monet"*`) で扱う
 - 日本語は 3 文字以上なら `search_ja`、2 文字以下は trigram に載らないので
   `image_translations.text` への LIKE にフォールバックする (画面に注記が出る)
 - 「Monet 睡蓮」のように混ざった入力は語ごとに振り分けて AND を取る
@@ -91,21 +79,7 @@ FTS5 の式を直接書きたいときは「FTS5 の式をそのまま渡す」�
   "Medieval Art"、Paris Musées は仏語のジャンル名) ので、横断ファセットとしては
   そのまま使えない。「中世の宗教画」は今のところ
   「キーワード + 年レンジ + ソース別 style」で近似するしかない
-- 件数は 10,000 件で打ち切って `10,000+` と出す。136 万行を毎回数え切ると遅いため
+- 件数は 10,000 件で打ち切って `10,000+` と出す。全件を毎回数え切ると遅いため
 - `/stats` は初回 10 秒ほどかかる (`images` と `image_artists` の全走査を含む)
 - 日本語検索は `image_translations` が埋まっていないと機能しない。
   `ruby apply_translations.rb titles` の後に `go run . index` で作り直すこと
-
-## 派生層を埋めてから使う
-
-執筆時点の `hm.db` は派生層が空だった。以下を回すと finder で見える情報が増える。
-
-```bash
-cd ../importer
-ruby normalize_dates.rb             # → image_dates       (制作年の絞り込みが効く)
-ruby normalize_artists.rb           # → role_bucket       (rijksmuseum と aic が 0%)
-ruby apply_translations.rb seed
-ruby apply_translations.rb titles   # → image_translations (日本語検索が効く)
-ruby apply_translations.rb artists
-cd ../finder && go run . index      # 索引を作り直す
-```

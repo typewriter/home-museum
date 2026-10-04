@@ -143,7 +143,7 @@ type IndexStatus struct {
 	SizeBytes     int64
 }
 
-// Stale は再構築が要るかどうか。件数か最終更新時刻がずれていれば true。
+// Stale は再構築が要るかどうか。
 func (st IndexStatus) Stale() bool {
 	if !st.Present {
 		return true

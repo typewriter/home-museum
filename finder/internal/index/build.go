@@ -1,8 +1,5 @@
-// Package index は finder が所有する検索インデックス (index.db) を作る。
-//
-// hm.db には一切書かない。「テーブルごとに書き手を1つに固定する」(spec_schema.md)
-// という importer 側の原則を守るため、finder の派生成果物は別ファイルに分ける。
-// index.db はいつでも捨てて作り直せる。
+// Package index は検索インデックス (index.db) を作る。hm.db に書かない理由は
+// store パッケージの説明を参照。index.db はいつでも捨てて作り直せる。
 package index
 
 import (
@@ -205,8 +202,7 @@ func Build(ctx context.Context, dbPath, indexPath string, log io.Writer) error {
 		fmt.Fprintf(log, "%.1fs\n", time.Since(start).Seconds())
 	}
 
-	// 鮮度判定の材料。hm.db 側の件数と最終更新時刻を焼いておき、ずれたら
-	// UI が「インデックスが古い」と出す。
+	// 鮮度判定 (store.IndexStatus) の材料。
 	var srcImages int64
 	var srcMaxUpd string
 	if err := db.QueryRowContext(ctx,

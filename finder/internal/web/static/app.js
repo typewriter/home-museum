@@ -40,7 +40,7 @@
     });
   }
 
-  // 表のセルはクリックで全選択する。ID や person_key をコピーしやすくするため。
+  // 表のセルはダブルクリックで全選択する。ID や person_key をコピーしやすくするため。
   document.querySelectorAll('table.grid').forEach(function (table) {
     table.addEventListener('dblclick', function (e) {
       var td = e.target.closest('td');

@@ -131,7 +131,6 @@ func (s *Store) Stats(ctx context.Context) (*Stats, error) {
 		out.Totals.ArtistJa += st.ArtistJa
 	}
 	out.Totals.Source = "合計"
-	// 件数の多い順に並べる。
 	for i := 1; i < len(out.Sources); i++ {
 		for j := i; j > 0 && out.Sources[j].Images > out.Sources[j-1].Images; j-- {
 			out.Sources[j], out.Sources[j-1] = out.Sources[j-1], out.Sources[j]

@@ -173,16 +173,6 @@ func (s *Server) facets(ctx context.Context) map[string][]store.FacetValue {
 	return f
 }
 
-// InvalidateCaches は索引を作り直したあとに呼ぶ想定 (現状は起動時のみ)。
-func (s *Server) InvalidateCaches() {
-	s.statusMu.Lock()
-	s.statusAt = time.Time{}
-	s.statusMu.Unlock()
-	s.facetsMu.Lock()
-	s.facetsOnce = false
-	s.facetsMu.Unlock()
-}
-
 // ---- クエリパラメータの取り出し ----
 
 func q(r *http.Request, key string) string {

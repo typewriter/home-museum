@@ -9,7 +9,7 @@ import (
 	"unicode"
 )
 
-// CountCap は件数表示の上限。1,361,997 件を毎回数え切ると遅いので、ここで
+// CountCap は件数表示の上限。全件を毎回数え切ると遅いので、ここで
 // 打ち切って「10,000+ 件」と出す。
 const CountCap = 10000
 
@@ -290,7 +290,7 @@ func (s *Store) SearchWorks(ctx context.Context, p SearchParams) (*SearchResult,
 		b.addWhere("i.origin LIKE ?", like(p.Origin))
 	}
 	if p.PersonKey != "" {
-		// EXISTS だと images 側から 136 万行を舐めることになる。IN にすると
+		// EXISTS だと images 側から全行を舐めることになる。IN にすると
 		// image_artists_person 索引から入って一気に絞れる。
 		b.addWhere("i.id IN (SELECT ia.image_id FROM image_artists ia WHERE ia.person_key = ?)",
 			p.PersonKey)
