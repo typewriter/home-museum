@@ -1,0 +1,28 @@
+{{define "content"}}
+{{$d := .Data}}{{$a := $d.Artist}}
+<h1>{{$a.DisplayName}}
+  {{with $a.LifeSpan}}<span class="muted">{{.}}</span>{{end}}
+</h1>
+<p class="meta">
+  <code>{{$a.PersonKey}}</code>
+  <span class="kind {{$a.KeyKind}}">{{$a.KeyKind}}</span>
+  {{if $d.Found}}
+    作品 {{comma $a.ImageCount}} 件 / 作者エントリ {{comma $a.EntryCount}} 件
+  {{else}}
+    <span class="null">artists テーブルに行がありません (person_key だけが image_artists に付いている状態)</span>
+  {{end}}
+  <a class="btn" href="/?person_key={{$a.PersonKey}}">作品を検索</a>
+</p>
+
+<section>
+  <h2>寄せられた生表記 <span class="muted">image_artists の name_raw × 判定手法</span></h2>
+  <p class="muted">同じ人物が館ごとに違う表記で入っている。display_name はここから
+    「役割接頭辞を除いた表記の最頻値」として決まる (spec_schema.md §5)。</p>
+  {{template "table" $d.Entries}}
+</section>
+
+<section>
+  <h2>ソース別の作品数</h2>
+  {{template "table" $d.Sources}}
+</section>
+{{end}}

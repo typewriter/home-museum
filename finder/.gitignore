@@ -1,0 +1,9 @@
+# finder が作る検索インデックス (hm.db から再生成できる)
+index.db
+index.db-wal
+index.db-shm
+index.db.building*
+
+# ビルド成果物
+/finder
+
