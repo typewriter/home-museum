@@ -29,16 +29,16 @@ export function Room({ kind, exKey, n }: Props) {
   };
   const exit = () => navigate(`${base}?page=${Math.ceil(n / catalogPer)}`);
 
-  const goRef = useRef({ go, exit, n });
-  goRef.current = { go, exit, n };
+  const goRef = useRef({ go, n });
+  goRef.current = { go, n };
 
+  // Esc は拾わない。ブラウザの全画面表示の解除 (Chrome on Windows など) を奪ってしまう。
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
-      const { go, exit, n } = goRef.current;
+      const { go, n } = goRef.current;
       if (e.key === "ArrowRight") go(n + 1);
       else if (e.key === "ArrowLeft") go(n - 1);
-      else if (e.key === "Escape") exit();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -72,7 +72,7 @@ export function Room({ kind, exKey, n }: Props) {
       <div className="room-stage">
       <header className="room-bar">
         <button className="room-exit" onClick={exit}>
-          ← {data?.exhibition.title ?? ""}
+          ← 戻る
         </button>
         <span className="room-count">{data ? `${n} / ${total}` : ""}</span>
       </header>
@@ -141,7 +141,7 @@ function Caption({ work: w }: { work: Work }) {
           {sourceNames[w.source] ?? w.source}で見る ↗
         </a>
       </p>
-      <p className="caption-hint">← → キー、またはスワイプで移動 / Esc で戻る</p>
+      <p className="caption-hint">← → キー、またはスワイプで移動</p>
     </section>
   );
 }
