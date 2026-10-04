@@ -7,12 +7,15 @@ export function NotFoundPage() {
   return (
     <>
       <Header />
-      <main className="page narrow">
-      <h1 className="heading">見つかりません</h1>
-      <p>お探しの展示は終了したか、まだ公開されていません。</p>
-      <p>
-        <Link to="/">トップへ戻る</Link>
-      </p>
+      <main className="container page">
+        <p className="eyebrow">Not Found</p>
+        <h1 className="display">見つかりません</h1>
+        <p className="lead">お探しの展示は終了したか、まだ公開されていません。</p>
+        <p>
+          <Link to="/" className="text-link">
+            トップへ戻る
+          </Link>
+        </p>
       </main>
     </>
   );

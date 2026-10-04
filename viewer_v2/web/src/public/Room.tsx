@@ -100,52 +100,46 @@ export function Room({ kind, exKey, n }: Props) {
       </div>
 
       {data && <Caption work={data.room.work} />}
-      {st.status === "error" && <p className="muted">読み込めませんでした。</p>}
+      {st.status === "error" && <p className="caption muted">読み込めませんでした。</p>}
     </div>
   );
 }
 
 function Caption({ work: w }: { work: Work }) {
+  const facts: [string, string | undefined][] = [
+    ["素材・技法", w.medium],
+    ["寸法", w.dimensions],
+    ["所蔵", w.credit],
+  ];
   return (
     <section className="caption">
-      <h1 className="caption-title">{displayTitle(w)}</h1>
-      {w.title_ja && w.title && <p className="caption-original">{w.title}</p>}
-      <p className="caption-artist">
-        {w.artist}
-        {w.date && <span className="caption-date">{w.artist ? "、" : ""}{w.date}</span>}
-      </p>
-      <dl className="caption-meta">
-        {w.medium && (
-          <>
-            <dt>素材・技法</dt>
-            <dd>{w.medium}</dd>
-          </>
-        )}
-        {w.dimensions && (
-          <>
-            <dt>寸法</dt>
-            <dd>{w.dimensions}</dd>
-          </>
-        )}
-        {w.credit && (
-          <>
-            <dt>所蔵</dt>
-            <dd>{w.credit}</dd>
-          </>
-        )}
+      <div className="caption-head">
+        <h1 className="caption-title">{displayTitle(w)}</h1>
+        {w.title_ja && w.title && <p className="caption-original">{w.title}</p>}
+        <p className="caption-artist">{[w.artist, w.date].filter(Boolean).join("、")}</p>
+      </div>
+      <dl className="caption-facts">
+        {facts
+          .filter(([, v]) => v)
+          .map(([k, v]) => (
+            <div key={k}>
+              <dt>{k}</dt>
+              <dd>{v}</dd>
+            </div>
+          ))}
       </dl>
-      <p className="caption-source">
-        <a href={w.source_url} target="_blank" rel="noopener noreferrer">
-          {sourceNames[w.source] ?? w.source}で見る ↗
-        </a>
-      </p>
       {w.description && (
         <details className="caption-description">
           <summary>解説 (所蔵館による)</summary>
           <p>{w.description}</p>
         </details>
       )}
-      <p className="caption-hint muted small">← → キー、またはスワイプで移動 / Esc で入口へ</p>
+      <p className="caption-source">
+        <a href={w.source_url} target="_blank" rel="noopener noreferrer" className="text-link">
+          {sourceNames[w.source] ?? w.source}で見る ↗
+        </a>
+      </p>
+      <p className="caption-hint">← → キー、またはスワイプで移動 / Esc で入口へ</p>
     </section>
   );
 }
