@@ -1,0 +1,14 @@
+# DB と画像はイメージに入れない (volume で渡す)
+*.db
+*.db-wal
+*.db-shm
+*.db.tmp
+/data/
+/imagecache/
+
+# web/ はイメージの中でビルドし直す
+/web/node_modules/
+/web/dist/
+
+/viewer_v2
+.env

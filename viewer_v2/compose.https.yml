@@ -1,0 +1,15 @@
+# viewer_v2 を ../caddy-host (複数サービス共通の Caddy) 経由で公開するときの
+# オーバーレイ。caddy-host が作る外部ネットワーク homemuseum に参加させるだけで、
+# Caddyfile は caddy-host 側にある (追記する内容は README.md)。
+#
+#   docker compose -f docker-compose.yml -f compose.https.yml up -d --build
+
+services:
+  viewer:
+    networks:
+      - default
+      - homemuseum
+
+networks:
+  homemuseum:
+    external: true
