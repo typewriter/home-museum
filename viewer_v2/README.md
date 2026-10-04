@@ -64,3 +64,56 @@ import が取り込み層のテーブルしか DROP しないことはテスト 
 **作者の作品数 (`artists.work_count`) は export で数え直す。** hm.db の
 `artists.image_count` は画像の無い作品や、出版社・刷り師としての関与
 (`role_bucket = 'non_creator'`) まで数えていて、公開する作者を選ぶ閾値に使えない。
+
+## VPS へのデプロイ
+
+`.env` に `R2_ACCOUNT_ID` / `R2_BUCKET` / `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` と
+`VIEWER_BASE_URL` (例: `https://uchibi.nyamikan.net`) を書く。
+
+```bash
+docker compose -f docker-compose.yml -f compose.https.yml up -d --build
+```
+
+HTTPS の受け口は複数サービス共通の `../caddy-host` (このリポジトリの外)。その Caddyfile に
+次を足す。パスは `/api` や `/img` を絶対パスで持っているので、ドメインの直下に置く。
+
+```caddyfile
+{$VIEWER_DOMAIN} {
+	@admin path /admin /admin/* /api/admin/*
+	basic_auth @admin {
+		{$VIEWER_ADMIN_USER} {$VIEWER_ADMIN_HASH}   # caddy hash-password で作る
+	}
+	reverse_proxy viewer:8080
+}
+```
+
+**管理画面の認証は Caddy にだけ任せている。** viewer_v2 自身は認証を持たないので、
+コンテナのポートを外に出さないこと (`docker-compose.yml` は 127.0.0.1 にしか開けない)。
+basic 認証の資格情報はクロスサイトのリクエストにもブラウザが付けるので、書き込み系の
+管理 API はアプリ側で同一オリジンに限っている (`internal/web/api_admin.go`)。
+
+### 作品データの入れ替え
+
+**import の前に VPS のスナップショットを取る。** viewer_v2 はバックアップの機能を持たず、
+コレクション (人の手でしか作れない) を守るのはこのスナップショットだけになる。
+
+```bash
+# ローカル
+go run . export -hm ../importer/hm.db -out works.db
+scp works.db vps:home-museum/viewer_v2/data/
+
+# VPS (サービスを止めてから)
+docker compose stop viewer
+docker compose run --rm viewer /app/viewer_v2 import works.db
+docker compose start viewer
+rm data/works.db
+```
+
+### finder からの移行 (1 回だけ)
+
+finder の `cache.db` を `data/` に置いてから、画像キャッシュの状態を移す。移し終えたら
+finder のコンテナを止めてよい (`cd ../finder && docker compose down`)。
+
+```bash
+docker compose run --rm viewer /app/viewer_v2 migrate-cache finder-cache.db
+```
