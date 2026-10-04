@@ -645,11 +645,41 @@ button {
   font-size: var(--fs-s);
 }
 
-.caption-hint {
-  margin-top: var(--s3);
-  font-size: var(--fs-xs);
-  color: var(--room-ink-2);
+.room-hint {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 1;
+  transform: translate(-50%, -50%);
+  margin: 0;
+  padding: var(--s3) var(--s4);
+  background: hsl(0 0% 0% / 0.65);
+  color: var(--room-ink);
+  font-size: var(--fs-s);
   letter-spacing: 0.08em;
+  white-space: nowrap;
+  pointer-events: none;
+  animation: room-hint 3.5s ease forwards;
+}
+
+@keyframes room-hint {
+  0% {
+    opacity: 0;
+  }
+  10%,
+  75% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* 動きを減らす設定では、フェードせずに同じ時間だけ出して消す */
+@media (prefers-reduced-motion: reduce) {
+  .room-hint {
+    animation-timing-function: steps(1, end);
+  }
 }
 
 @media (max-width: 760px) {

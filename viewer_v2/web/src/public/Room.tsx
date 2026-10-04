@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api, displayTitle, sourceNames, type Kind, type Work } from "../shared/api";
 import { Artwork, preload } from "../shared/Artwork";
 import { navigate, path } from "../shared/router";
@@ -78,6 +78,7 @@ export function Room({ kind, exKey, n }: Props) {
       </header>
 
       <div className="room-wall">
+        <Hint />
         {n > 1 && (
           <button className="room-arrow prev" aria-label="前の作品" onClick={() => go(n - 1)}>
             ‹
@@ -141,7 +142,18 @@ function Caption({ work: w }: { work: Work }) {
           {sourceNames[w.source] ?? w.source}の作品詳細ページへ ↗
         </a>
       </p>
-      <p className="caption-hint">← → キー、またはスワイプで移動</p>
     </section>
+  );
+}
+
+// Hint は展示室に入ったときに一度だけ操作を教える。Room は作品を移っても
+// 作り直されないので、矢印で進むたびには出ない。
+function Hint() {
+  const [shown, setShown] = useState(true);
+  if (!shown) return null;
+  return (
+    <p className="room-hint" role="status" onAnimationEnd={() => setShown(false)}>
+      ← → キー、またはスワイプで移動
+    </p>
   );
 }
