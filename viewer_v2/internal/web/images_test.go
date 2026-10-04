@@ -28,33 +28,57 @@ type fixture struct {
 	srv   *Server
 }
 
-func newFixture(t *testing.T) *fixture {
+// newImageFixture は画像キャッシュ付き。変換に libvips が要るので、無ければスキップする。
+func newImageFixture(t *testing.T) *fixture {
 	t.Helper()
 	if _, err := exec.LookPath("vipsthumbnail"); err != nil {
 		t.Skip("libvips-tools が無いのでスキップします")
 	}
-	ctx := context.Background()
-	dir := t.TempDir()
-	d, err := db.Open(ctx, filepath.Join(dir, "viewer.db"))
+	f := newDBFixture(t)
+	local, err := imagecache.OpenBlob("local:" + filepath.Join(t.TempDir(), "blob"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.cache, err = imagecache.New(context.Background(), imagecache.Options{DB: f.db.W, Store: presignBlob{local}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.srv = New(Options{DB: f.db, Cache: f.cache, Now: func() time.Time { return f.now }})
+	mustExec(t, f.db, `INSERT INTO image_cache (url_hash, image_id, source, source_url, origin_url, state, variants, requested_at)
+		VALUES (?, 1, 'aic', 'https://a/1', 'x', 'ready', '400,1600', 'x')`, imagecache.Hash("https://a/1"))
+	return f
+}
+
+// newDBFixture は works と作者とコレクションを入れた viewer.db。
+func newDBFixture(t *testing.T) *fixture {
+	t.Helper()
+	d, err := db.Open(context.Background(), filepath.Join(t.TempDir(), "viewer.db"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { d.Close() })
-	local, err := imagecache.OpenBlob("local:" + filepath.Join(dir, "blob"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	c, err := imagecache.New(ctx, imagecache.Options{DB: d.W, Store: presignBlob{local}})
-	if err != nil {
-		t.Fatal(err)
-	}
-	f := &fixture{db: d, cache: c, now: time.Date(2026, 10, 4, 15, 0, 0, 0, time.UTC)}
-	f.srv = New(Options{DB: d, Cache: c, Now: func() time.Time { return f.now }})
-	mustExec(t, d, `INSERT INTO works (id, source, source_url, image_url, title) VALUES
-		(1, 'aic', 'https://a/1', 'https://img/1.jpg', 'Ready'),
-		(2, 'aic', 'https://a/2', 'https://img/2.jpg', 'Not yet')`)
-	mustExec(t, d, `INSERT INTO image_cache (url_hash, image_id, source, source_url, origin_url, state, variants, requested_at)
-		VALUES (?, 1, 'aic', 'https://a/1', 'x', 'ready', '400,1600', 'x')`, imagecache.Hash("https://a/1"))
+	mustExec(t, d, `INSERT INTO works (id, source, source_url, image_url, title, title_ja, artist, year_start) VALUES
+		(1, 'aic', 'https://a/1', 'https://img/1.jpg', 'Water Lilies', '睡蓮', 'Claude Monet', 1906),
+		(2, 'aic', 'https://a/2', 'https://img/2.jpg', 'Undated',      NULL,   'Claude Monet', NULL),
+		(3, 'met', 'https://m/3', 'https://img/3.jpg', 'Haystacks',    NULL,   'Claude Monet', 1890),
+		(4, 'rijksmuseum', 'https://r/4', 'https://img/4.jpg', 'Print A', NULL, 'Someone', 1700),
+		(5, 'rijksmuseum', 'https://r/5', 'https://img/5.jpg', 'Print B', NULL, 'Someone', 1701)`)
+	mustExec(t, d, `INSERT INTO work_artists (work_id, position, person_key, role_bucket) VALUES
+		(1, 0, 'ulan:1', 'creator'), (2, 0, 'ulan:1', NULL), (3, 0, 'ulan:1', NULL),
+		(3, 1, 'ulan:2', 'non_creator'), (1, 1, 'ulan:2', 'creator'),
+		(4, 0, 'cluster:r|https://id/2101', NULL), (5, 0, 'cluster:r|https://id/2101', NULL)`)
+	mustExec(t, d, `INSERT INTO artists (person_key, display_name, name_ja, birth_year, death_year, work_count) VALUES
+		('ulan:1', 'Claude Monet', 'クロード・モネ', 1840, 1926, 3),
+		('ulan:2', 'Publisher', NULL, NULL, NULL, 1),
+		('cluster:r|https://id/2101', 'Someone', NULL, NULL, NULL, 2)`)
+	mustExec(t, d, `INSERT INTO collections (id, slug, title, title_en, sort, published, created_at, updated_at) VALUES
+		(1, 'pub', '睡蓮と積みわら', 'Lilies', 'manual', 1, 'x', '2026-10-02'),
+		(2, 'draft', '下書き', NULL, 'manual', 0, 'x', '2026-10-01')`)
+	mustExec(t, d, `INSERT INTO collection_works (collection_id, source_url, position, added_at) VALUES
+		(1, 'https://a/2', 0, 'x'), (1, 'https://a/1', 1, 'x'), (1, 'https://gone/9', 2, 'x'),
+		(2, 'https://m/3', 0, 'x')`)
+	f := &fixture{db: d, now: time.Date(2026, 10, 4, 15, 0, 0, 0, time.UTC)}
+	f.srv = New(Options{DB: d, ArtistMinWorks: 2, Now: func() time.Time { return f.now }})
 	return f
 }
 
@@ -73,7 +97,7 @@ func (f *fixture) get(t *testing.T, path string) *httptest.ResponseRecorder {
 }
 
 func TestImageRedirectsToPresignedURLAlignedToWindow(t *testing.T) {
-	f := newFixture(t)
+	f := newImageFixture(t)
 	rec := f.get(t, "/img/1/400")
 	if rec.Code != http.StatusFound {
 		t.Fatalf("code = %d, want 302", rec.Code)
@@ -100,7 +124,7 @@ func TestImageRedirectsToPresignedURLAlignedToWindow(t *testing.T) {
 }
 
 func TestImageNotCachedIsQueuedAsVisitor(t *testing.T) {
-	f := newFixture(t)
+	f := newImageFixture(t)
 	rec := f.get(t, "/img/2/1600")
 	if rec.Code != http.StatusAccepted {
 		t.Fatalf("code = %d, want 202", rec.Code)
@@ -117,7 +141,7 @@ func TestImageNotCachedIsQueuedAsVisitor(t *testing.T) {
 }
 
 func TestImageNotFound(t *testing.T) {
-	f := newFixture(t)
+	f := newImageFixture(t)
 	for _, path := range []string{"/img/999/400", "/img/abc/400", "/img/1/123"} {
 		if rec := f.get(t, path); rec.Code != http.StatusNotFound {
 			t.Errorf("%s: code = %d, want 404", path, rec.Code)
