@@ -1,20 +1,22 @@
 /*
- * 公開画面。作品が主役なので、サイトの色はモノトーンだけにし、美術館の展示室の
- * ように黒を地にする。展示室 (1 作品ずつ見る画面) は一覧より一段暗くする。
+ * 公開画面。作品が主役なので、サイトの色はモノトーンだけにする。
+ * 地は純白にしない (まぶしい)。美術館の壁のような、わずかに温かい白にする。
+ * 黒地も採らない。一覧のサムネが沈んで見えにくくなった。
+ * 展示室 (1 作品ずつ見る画面) だけは暗くして、作品に目が行くようにする。
  * 区切りは罫線ではなく余白と面 (薄い灰色の塗り) で付ける。
  * 文字の大きさと余白は下の段階からしか選ばない。同じ役割の要素が
  * どのページでも同じ見た目で繰り返されるように。
  */
 :root {
-  --ink: #ebebeb;
-  --ink-2: #a6a6a6;
-  --ink-3: #767676;
-  --paper: #0e0e0e;
-  --tone: #1b1b1b;
-  --room: #070707;
+  --ink: #222120;
+  --ink-2: #5c5b59;
+  --ink-3: #8c8a87;
+  --paper: #f5f4f1;
+  --tone: #e9e7e3;
+  --room: #121212;
   --room-ink: #ebebeb;
   --room-ink-2: #8f8f8f;
-  --room-tone: #161616;
+  --room-tone: #1c1c1c;
 
   --font: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
 
@@ -34,7 +36,7 @@
   --s7: 80px;
 
   --gutter: 40px;
-  color-scheme: dark;
+  color-scheme: light;
 }
 
 * {
@@ -154,7 +156,7 @@ button {
 }
 
 .button:hover {
-  background: #c4c4c4;
+  background: #4a4948;
 }
 
 .artwork-placeholder {
