@@ -16,7 +16,7 @@ export function Top() {
       <main>
         <section className="container intro">
           <h1 className="display">
-            気軽に楽しむ、<wbr />名画の世界
+            気軽に楽しむ、<wbr />名画と名品
           </h1>
           <p className="intro-note">
             著作権の切れたパブリックドメインの作品を<wbr />自由にご覧いただけます。

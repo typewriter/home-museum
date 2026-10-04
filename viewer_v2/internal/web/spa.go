@@ -15,7 +15,7 @@ import (
 
 const (
 	siteName        = "おうちの美術館"
-	siteDescription = "気軽に楽しむ、名画の世界。"
+	siteDescription = "気軽に楽しむ、名画と名品。"
 )
 
 // spa は Vite がビルドした dist/ を配る。
