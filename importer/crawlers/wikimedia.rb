@@ -276,7 +276,7 @@ module Wikimedia
 
   WBGETENTITIES_URL = 'https://www.wikidata.org/w/api.php'
   BATCH_SIZE = 50
-  REQUEST_INTERVAL_SEC = 1.0
+  REQUEST_INTERVAL_SEC = 30.0
 
   # Retry-After (秒数 or HTTP-date、RFC 9110 §10.2.3) を待機秒数にする。
   # "Wed, 21 Oct 2026 07:28:00 GMT" のような日付形式は String#to_i だと
@@ -322,6 +322,9 @@ module Wikimedia
     m && m[1].to_i
   end
 
+  # LMDBへの書き込みはバッチ内の1件ずつ即コミットされ、次回起動時は
+  # todo の算出で "author:#{qid}" 済みを弾くため、Ctrl+C で中断しても
+  # 再度 `enrich` を叩くだけで取りこぼしなく再開できる。
   def enrich
     db = KVStore.new(LMDB_PATH)
 
