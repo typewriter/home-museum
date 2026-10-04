@@ -190,6 +190,10 @@ button {
   margin-bottom: var(--s4);
 }
 
+.section-heading.center {
+  text-align: center;
+}
+
 .button {
   display: inline-block;
   background: var(--accent);
@@ -220,10 +224,11 @@ button {
 
 .intro {
   padding-block: var(--s5) var(--s6);
+  text-align: center;
 }
 
-/* 見出しを文節の途中で折り返さない (改行位置は <wbr> で決める) */
-.intro .display {
+/* 見出しと紹介文を文節の途中で折り返さない (改行位置は <wbr> で決める) */
+.intro {
   word-break: keep-all;
 }
 

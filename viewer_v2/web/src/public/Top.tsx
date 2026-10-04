@@ -18,12 +18,16 @@ export function Top() {
           <h1 className="display">
             気軽に楽しむ、<wbr />名画の世界
           </h1>
-          <p className="intro-note">※当サイトの作品は、すべてパブリックドメイン（著作権の切れたもの）です。</p>
+          <p className="intro-note">
+            著作権の切れたパブリックドメインの作品を<wbr />自由にご覧いただけます。
+          </p>
         </section>
 
         <section className="band exhibitions-band">
           <div className="container">
-          <SectionHeading en="Exhibitions">開催中の展覧会</SectionHeading>
+          <SectionHeading en="Exhibitions" center>
+            開催中の展覧会
+          </SectionHeading>
           {cols.status === "ok" && cols.data.collections.length === 0 && (
             <p className="muted">いまは展覧会がありません。作者から作品を探せます。</p>
           )}

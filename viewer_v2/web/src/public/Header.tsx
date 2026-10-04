@@ -27,9 +27,9 @@ export function Footer() {
 }
 
 // SectionHeading は全ページで同じ見出しの形を繰り返すためのもの (英字の小見出し + 和文)。
-export function SectionHeading({ en, children }: { en: string; children: React.ReactNode }) {
+export function SectionHeading({ en, center, children }: { en: string; center?: boolean; children: React.ReactNode }) {
   return (
-    <h2 className="section-heading">
+    <h2 className={center ? "section-heading center" : "section-heading"}>
       <span className="eyebrow">{en}</span>
       {children}
     </h2>
