@@ -5,11 +5,11 @@ require "rexml/document"
 
 # 各美術館の LMDB を images / image_artists と同じ共通スキーマのレコードへ変換する。
 #
-# LMDB を走査するのはここだけ (loader.rb と title_translation_batch.rb が使う)。
+# LMDB を走査するのはここだけ (loader.rb と with_llms/title_translation_batch.rb が使う)。
 # Rijksmuseum の RDF パースは全走査に数十分かかるため、正規化ルールの適用は
 # LMDB ではなく DB を読む別スクリプト (normalize_*.rb) 側に置いてある。
 #
-# hm.db への投入 (loader.rb) とタイトル日本語訳 (title_translation_batch.rb) は
+# hm.db への投入 (loader.rb) とタイトル日本語訳 (with_llms/title_translation_batch.rb) は
 # 「どのレコードを対象とするか」の条件と source_url の作り方が一致していないと
 # CSV が images に JOIN できなくなるため、抽出はここ1箇所だけに実装する。
 #
@@ -28,12 +28,13 @@ module Loaders
   # ソース名 → images.source に入るキーと、既定の LMDB ファイル名。
   # label は人間向けの表示名で、DB には入らない (CSV の可読性のためだけに使う)。
   SOURCES = {
-    "aic"         => { label: "AIC",                     lmdb: "aic.lmdb" },
-    "met"         => { label: "MET",                     lmdb: "met.lmdb" },
-    "parismusees" => { label: "Paris Musées",            lmdb: "parismusees.lmdb" },
-    "rijksmuseum" => { label: "Rijksmuseum",             lmdb: "rijksmuseum.lmdb" },
-    "smithsonian" => { label: "Smithsonian",             lmdb: "smithsonian.lmdb" },
-    "cleveland"   => { label: "Cleveland Museum of Art", lmdb: "cleveland.lmdb" },
+    "aic"         => { label: "AIC",                     lmdb: "crawlers/aic.lmdb" },
+    "met"         => { label: "MET",                     lmdb: "crawlers/met.lmdb" },
+    "parismusees" => { label: "Paris Musées",            lmdb: "crawlers/parismusees.lmdb" },
+    "rijksmuseum" => { label: "Rijksmuseum",             lmdb: "crawlers/rijksmuseum.lmdb" },
+    "smithsonian" => { label: "Smithsonian",             lmdb: "crawlers/smithsonian.lmdb" },
+    "cleveland"   => { label: "Cleveland Museum of Art", lmdb: "crawlers/cleveland.lmdb" },
+    "wikimedia"   => { label: "Wikimedia Commons",       lmdb: "crawlers/wikimedia.lmdb" },
   }.freeze
 
   module_function
@@ -354,6 +355,83 @@ module Loaders
         description: text_for.call(cho.get_elements("dc:description")),
         source_url: aggregation.get_elements("edm:isShownAt").first&.attributes&.[]("rdf:resource"),
         image_url: image_url,
+        artists: artists,
+      })
+    }
+  end
+
+  require_relative "crawlers/wikimedia"
+
+  # BCE は負数なので、"-" で繋ぐと "-100--50" になる。区切りは en dash にする。
+  def wikimedia_date_range(date_start, date_end)
+    return date_start.to_s if date_start && date_end.nil?
+    return date_end.to_s if date_end && date_start.nil?
+    return nil if date_start.nil?
+    return date_start.to_s if date_start == date_end
+
+    "#{date_start}–#{date_end}"
+  end
+
+  def wikimedia(path)
+    # 作者 (author:Q...) と作品が同じ LMDB にあるので、1 回の走査で振り分ける。
+    authors = {}
+    artworks = []
+    store = KVStore.new(path)
+    begin
+      store.each { |key, value|
+        if key.start_with?("author:")
+          authors[key.delete_prefix("author:")] = JSON.parse(value)
+        else
+          artworks << value
+        end
+      }
+    ensure
+      store.close
+    end
+
+    artworks.each { |raw|
+      json = JSON.parse(raw)
+      next if !present(json["image_url"])
+
+      titles = json["titles"] || {}
+      title = present(titles["en"]) || present(json["label_en"]) ||
+              present(titles.values.compact.first) || present(json["label_ja"])
+
+      creators = json["creators"] || []
+      artists = creators.map { |qid|
+        author = authors[qid] || {}
+        name = present(author["name_en"]) || present(author["name_ja"])
+        {
+          name_raw: name || qid,
+          birth_year: author["birth_year"],
+          death_year: author["death_year"],
+          source_artist_id: qid,
+          authority_urls: authority_urls("https://www.wikidata.org/wiki/#{qid}"),
+        }
+      }
+
+      date_start = Wikimedia.wikidata_year(json["inception_start"])
+      date_end = Wikimedia.wikidata_year(json["inception_end"])
+
+      yield({
+        source: "wikimedia",
+        source_id: json["qid"],
+        category: (json["instance_of"] || []).filter_map { |q| Wikimedia::TARGET_CLASSES[q] }.join(", "),
+        style: nil,
+        title: title,
+        artist: artists.map { |a| a[:name_raw] }.join(", "),
+        date: wikimedia_date_range(date_start, date_end),
+        date_raw_start: date_start,
+        date_raw_end: date_end,
+        date_raw_precision: nil,
+        medium: nil,
+        origin: nil,
+        dimensions: nil,
+        credit: nil,
+        description: nil,
+        source_url: "https://www.wikidata.org/wiki/#{json["qid"]}",
+        # Special:FilePath は http/https どちらでも同じ実体にリダイレクトされる。
+        image_url: json["image_url"].sub(/\Ahttp:/, "https:"),
         artists: artists,
       })
     }

@@ -54,15 +54,21 @@ CREATE TABLE IF NOT EXISTS image_artists (
   authority_urls         TEXT,           -- 外部典拠URLのJSON配列 (ULAN/Wikidata/VIAF/RKD)
   name_original_language TEXT,           -- 原語表記 (Cleveland name_in_original_language)
   role_bucket            TEXT,           -- ← normalize_artists.rb が埋める派生列
+  -- ↓ normalize_person.rb が埋める派生列。docs/spec_normalization.md
+  person_key             TEXT,           -- 名寄せ先 ('ulan:500031075' | 'cluster:aic|27558')。FK ではない
+  match_method           TEXT,           -- 発火したルール (authority_id / name_exact …)
+  match_confidence       TEXT,           -- high | medium | low
+  match_reason           TEXT,           -- 自由記述。手法ごとに書ける内容が違ってよい
   UNIQUE (image_id, position)
 );
 
 CREATE INDEX IF NOT EXISTS image_artists_image ON image_artists (image_id);
 CREATE INDEX IF NOT EXISTS image_artists_name ON image_artists (name_raw);
+CREATE INDEX IF NOT EXISTS image_artists_person ON image_artists (person_key);
 
 -- ===================== 派生: 各スクリプトが作り直せる =====================
 
--- 正規化した制作年。spec_normalization_year.md
+-- 正規化した制作年。docs/spec_normalization.md
 CREATE TABLE IF NOT EXISTS image_dates (
   image_id       INTEGER PRIMARY KEY REFERENCES images (id) ON DELETE CASCADE,
   date_start     INTEGER,        -- BCE は負数 (天文学的年表記)
@@ -74,7 +80,7 @@ CREATE TABLE IF NOT EXISTS image_dates (
 CREATE INDEX IF NOT EXISTS image_dates_start ON image_dates (date_start);
 CREATE INDEX IF NOT EXISTS image_dates_precision ON image_dates (date_precision);
 
--- 作品単位のテキスト翻訳 (いまは title のみ)。spec_normalization_title.md
+-- 作品単位のテキスト翻訳 (いまは title のみ)。docs/spec_normalization.md
 CREATE TABLE IF NOT EXISTS image_translations (
   image_id      INTEGER NOT NULL REFERENCES images (id) ON DELETE CASCADE,
   field         TEXT NOT NULL,   -- 'title' (将来 'description')
@@ -87,9 +93,20 @@ CREATE TABLE IF NOT EXISTS image_translations (
   PRIMARY KEY (image_id, field, lang)
 );
 
+-- 名寄せした人物。丸ごと作り直してよい。spec_schema.md §4
+CREATE TABLE IF NOT EXISTS artists (
+  person_key   TEXT PRIMARY KEY,
+  display_name TEXT NOT NULL,   -- 役割接頭辞を除いた表記の最頻値。spec_schema.md §5
+  birth_year   INTEGER,
+  death_year   INTEGER,
+  image_count  INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS artists_image_count ON artists (image_count);
+
 -- 作者エントリ単位の名前訳。人物単位ではないので同姓同名の誤統合が起きない。
 -- 名寄せ (artists テーブル) を導入したら、その訳を優先しつつ本テーブルは
--- 名寄せできなかったエントリのフォールバックとして残す。spec_normalization_author.md
+-- 名寄せできなかったエントリのフォールバックとして残す。docs/spec_normalization.md
 CREATE TABLE IF NOT EXISTS image_artist_names (
   image_artist_id INTEGER NOT NULL REFERENCES image_artists (id) ON DELETE CASCADE,
   lang            TEXT NOT NULL,

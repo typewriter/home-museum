@@ -108,7 +108,7 @@ module DateText
       years = bounded.scan(/(?<![\w.])-?\d{1,4}\b/) if years.empty?
 
       # 両端が書かれていれば range。before/after は「片側が本当に不明」なとき
-      # だけに限る (spec_normalization_year.md)。語順や修飾の別は問わない:
+      # だけに限る (docs/spec_normalization.md)。語順や修飾の別は問わない:
       #   "in or after 1818 - in or before 1842" / "in or before 1790 - in or after 1837"
       #   "after 1635 - 1670" / "1601 - before 1606-01-01"
       if years.size >= 2
