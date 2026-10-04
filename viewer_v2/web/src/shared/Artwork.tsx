@@ -12,18 +12,21 @@ type State =
   | { kind: "failed" }
   | { kind: "gone" };
 
-export const imageURL = (id: number, width: number) => `/img/${id}/${width}`;
+// 管理画面は /api/admin/img を使う。同じ画像を admin の優先度で積むため。
+export type ImageBase = "/img" | "/api/admin/img";
 
-async function probe(id: number, width: number): Promise<State> {
-  const r = await fetch(imageURL(id, width), { redirect: "manual" });
+export const imageURL = (id: number, width: number, base: ImageBase = "/img") => `${base}/${id}/${width}`;
+
+async function probe(id: number, width: number, base: ImageBase = "/img"): Promise<State> {
+  const r = await fetch(imageURL(id, width, base), { redirect: "manual" });
   // R2 なら 302 (opaqueredirect)、ローカルの保管先ならアプリが 200 で中継する。
   if (r.type === "opaqueredirect" || r.status === 200) return { kind: "ready" };
-  if (r.status === 202) return pollOnce(id, width);
+  if (r.status === 202) return pollOnce(id, width, base);
   return { kind: "gone" };
 }
 
-async function pollOnce(id: number, width: number): Promise<State> {
-  const r = await fetch(imageURL(id, width) + "/status");
+async function pollOnce(id: number, width: number, base: ImageBase = "/img"): Promise<State> {
+  const r = await fetch(imageURL(id, width, base) + "/status");
   if (!r.ok) return { kind: "gone" };
   const st = (await r.json()) as { state: string; ready: boolean; ahead?: number; eta_sec?: number };
   if (st.ready) return { kind: "ready" };
@@ -47,9 +50,10 @@ interface Props {
   alt: string;
   className?: string;
   eager?: boolean; // 画面に入るのを待たずに読む (展示室の主画像)
+  base?: ImageBase;
 }
 
-export function Artwork({ id, width, alt, className, eager }: Props) {
+export function Artwork({ id, width, alt, className, eager, base = "/img" }: Props) {
   const [state, setState] = useState<State>({ kind: "idle" });
   const [visible, setVisible] = useState(!!eager);
   const ref = useRef<HTMLDivElement>(null);
@@ -77,7 +81,7 @@ export function Artwork({ id, width, alt, className, eager }: Props) {
     const tick = async (first: boolean) => {
       let st: State;
       try {
-        st = first ? await probe(id, width) : await pollOnce(id, width);
+        st = first ? await probe(id, width, base) : await pollOnce(id, width, base);
       } catch {
         st = { kind: "failed" };
       }
@@ -93,10 +97,10 @@ export function Artwork({ id, width, alt, className, eager }: Props) {
       stop = true;
       window.clearTimeout(timer);
     };
-  }, [id, width, visible]);
+  }, [id, width, visible, base]);
 
   if (state.kind === "ready") {
-    return <img className={className} src={imageURL(id, width)} alt={alt} decoding="async" />;
+    return <img className={className} src={imageURL(id, width, base)} alt={alt} decoding="async" />;
   }
   return (
     <div ref={ref} className={`artwork-placeholder ${className ?? ""}`} role="img" aria-label={alt}>
