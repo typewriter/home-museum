@@ -25,6 +25,22 @@ go run . serve -images r2                    # R2_ACCOUNT_ID / R2_BUCKET / R2_AC
 
 画像キャッシュの設計は [`spec_image_cache.md`](spec_image_cache.md)。
 
+## 画面 (web/)
+
+React + Vite + TypeScript。ビルドした `web/dist/` を Go のバイナリに埋め込む (`web/embed.go`)。
+
+```bash
+cd web
+npm ci
+npm run dev     # http://localhost:5173 。/api と /img は 127.0.0.1:8080 の serve に任せる
+npm run build   # dist/ を作る。go build の前に要る (無ければ serve は 503 を返す)
+```
+
+**経路はライブラリを使わず自前で持つ** (`web/src/shared/router.tsx`)。作者のキー
+(person_key) は `/` を含むことがあり (`cluster:rijksmuseum|https://id.rijksmuseum.nl/...`)、
+`%2F` のまま 1 区切りとして扱いたい。ルーターライブラリの多くはパスをデコードしてから
+照合するので、そこで区切りが増える。
+
 ## viewer.db は 2 層を 1 ファイルに持つ
 
 | 層 | テーブル | 書き手 |
