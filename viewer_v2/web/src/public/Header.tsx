@@ -22,6 +22,7 @@ export function Footer() {
         </Link>
         <div className="footer-notes">
           <p>本サービスは、自由に利用できるパブリックドメインの作品を用いています。</p>
+          <p>作品名には機械翻訳を用いており、不正確な場合があります。</p>
           <p>
             Developer: たいぷらいた～ （
             <a href="https://www.nyamikan.net/" target="_blank" rel="noopener noreferrer" className="text-link">
