@@ -20,7 +20,16 @@ export function Footer() {
         <Link to="/" className="site-name">
           おうちの美術館
         </Link>
-        <p className="footer-note">掲載している作品は、すべてパブリックドメインです。</p>
+        <div className="footer-notes">
+          <p>本サービスは、自由に利用できるパブリックドメインの作品を用いています。</p>
+          <p>
+            Developer: たいぷらいた～ （
+            <a href="https://www.nyamikan.net/" target="_blank" rel="noopener noreferrer" className="text-link">
+              にゃみかん (nyamikan.net)
+            </a>
+            ）
+          </p>
+        </div>
       </div>
     </footer>
   );
