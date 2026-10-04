@@ -209,3 +209,20 @@ func TestAdminSearchWorksByTitle(t *testing.T) {
 		t.Errorf("空白だけなら何も返さない: %+v", r.Works)
 	}
 }
+
+func TestAdminClearFailures(t *testing.T) {
+	f := newImageFixture(t)
+	mustExec(t, f.db, `INSERT INTO image_cache (url_hash, image_id, source, source_url, origin_url, state, requested_at) VALUES
+		('h1', 2, 'aic', 'https://a/2', 'x', 'gone', 'x'),
+		('h2', 3, 'met', 'https://m/3', 'x', 'failed', 'x')`)
+	rec := f.do(t, "POST", "/api/admin/image-failures/clear", `{"source":"aic","states":["gone","failed"]}`)
+	if rec.Code != 200 || !strings.Contains(rec.Body.String(), `"cleared":1`) {
+		t.Fatalf("clear: %d %s", rec.Code, rec.Body)
+	}
+	if rec := f.do(t, "POST", "/api/admin/image-failures/clear", `{"states":["ready"]}`); rec.Code != http.StatusBadRequest {
+		t.Errorf("ready は消せない: %d", rec.Code)
+	}
+	if n := countRows(t, f, `SELECT count(*) FROM image_cache WHERE state = 'ready'`); n != 1 {
+		t.Errorf("ready の行が残っていない: %d", n)
+	}
+}

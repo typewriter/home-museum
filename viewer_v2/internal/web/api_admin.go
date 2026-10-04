@@ -31,6 +31,7 @@ func (s *Server) routeAdminAPI() {
 	h("GET /api/admin/artists/{key}", s.adminArtistWorks)
 	h("GET /api/admin/works", s.adminSearchWorks)
 	h("GET /api/admin/stats", s.adminStats)
+	h("POST /api/admin/image-failures/clear", s.adminClearFailures)
 	// 管理画面で選んでいる作品のサムネは、閲覧者より先に取りに行く。
 	h("GET /api/admin/img/{id}/{w}", s.handleImage(imagecache.PriorityAdmin))
 	h("GET /api/admin/img/{id}/{w}/status", s.handleImageStatus(imagecache.PriorityAdmin))
@@ -262,6 +263,26 @@ func (s *Server) adminSearchWorks(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{
 		"page": page, "per": catalogPer, "has_more": more, "works": works,
 	})
+}
+
+func (s *Server) adminClearFailures(w http.ResponseWriter, r *http.Request) {
+	if s.cache == nil {
+		writeError(w, http.StatusBadRequest, "画像キャッシュは無効です")
+		return
+	}
+	var body struct {
+		Source string   `json:"source"` // 空なら全館
+		States []string `json:"states"` // failed / gone
+	}
+	if !readJSON(w, r, &body) {
+		return
+	}
+	n, err := s.cache.ClearFailures(r.Context(), body.Source, body.States)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"cleared": n})
 }
 
 func (s *Server) adminStats(w http.ResponseWriter, r *http.Request) {

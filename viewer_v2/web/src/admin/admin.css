@@ -180,6 +180,10 @@ button.link.danger {
   text-align: right;
 }
 
+.admin-table .num button {
+  margin-left: 6px;
+}
+
 .admin-table.compact td,
 .admin-table.compact th {
   padding: 4px 10px;

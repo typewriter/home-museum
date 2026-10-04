@@ -291,3 +291,24 @@ func min(a, b int) int {
 	}
 	return b
 }
+
+// ClearFailures は失敗の記録 (failed / gone) を消す。消した作品は、次に表示された
+// ときに普通の要求として取り直される。queued に戻して一斉に積み直すことはしない。
+// 取得不可が数千件あると、そのぶんが閲覧者の要求より前に並んでしまうため。
+// source が空なら全館が対象。ready と取得待ちの行には触れない。
+func (c *Cache) ClearFailures(ctx context.Context, source string, states []string) (int64, error) {
+	var n int64
+	for _, st := range states {
+		if st != StateFailed && st != StateGone {
+			return 0, fmt.Errorf("消せるのは %s と %s だけです: %q", StateFailed, StateGone, st)
+		}
+		res, err := c.db.ExecContext(ctx,
+			`DELETE FROM image_cache WHERE state = ? AND (? = '' OR source = ?)`, st, source, source)
+		if err != nil {
+			return n, err
+		}
+		k, _ := res.RowsAffected()
+		n += k
+	}
+	return n, nil
+}

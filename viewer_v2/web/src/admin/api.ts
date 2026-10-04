@@ -95,5 +95,7 @@ export const admin = {
       "/api/admin/works?q=" + encodeURIComponent(q) + "&page=" + page,
       { signal },
     ),
+  clearFailures: (source: string, states: ("failed" | "gone")[]) =>
+    send<{ cleared: number }>("POST", "/api/admin/image-failures/clear", { source, states }),
   stats: () => getJSON<{ enabled: boolean; stats?: { by_source: SourceStat[] | null } }>("/api/admin/stats"),
 };

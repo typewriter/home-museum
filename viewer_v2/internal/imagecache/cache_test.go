@@ -370,3 +370,37 @@ func TestClaimByPriority(t *testing.T) {
 		}
 	}
 }
+
+// 失敗の記録を消すと、次の要求で取得待ちに積み直されること。ready には触れないこと。
+func TestClearFailures(t *testing.T) {
+	c := newTestCache(t)
+	ctx := context.Background()
+	for _, r := range []struct{ src, url, state string }{
+		{"aic", "https://a/gone", StateGone},
+		{"aic", "https://a/failed", StateFailed},
+		{"aic", "https://a/ready", StateReady},
+		{"met", "https://m/gone", StateGone},
+	} {
+		if _, err := c.db.Exec(`INSERT INTO image_cache (url_hash, image_id, source, source_url, origin_url, state, requested_at)
+			VALUES (?, 1, ?, ?, ?, ?, 'x')`, Hash(r.url), r.src, r.url, r.url, r.state); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := c.ClearFailures(ctx, "aic", []string{StateReady}); err == nil {
+		t.Fatal("ready を消せてしまった")
+	}
+	n, err := c.ClearFailures(ctx, "aic", []string{StateGone, StateFailed})
+	if err != nil || n != 2 {
+		t.Fatalf("n=%d err=%v, want aic の 2 件", n, err)
+	}
+	if _, ok, _ := c.lookup(ctx, Hash("https://m/gone")); !ok {
+		t.Error("ほかの館の行まで消えた")
+	}
+	if _, ok, _ := c.lookup(ctx, Hash("https://a/ready")); !ok {
+		t.Error("ready の行が消えた")
+	}
+	st, err := c.Request(ctx, Ref{ID: 1, Source: "aic", SourceURL: "https://a/gone", ImageURL: "https://a/gone.jpg"}, PriorityVisitor)
+	if err != nil || st.State != StateQueued {
+		t.Errorf("消した後の要求: state=%q err=%v, want queued", st.State, err)
+	}
+}
