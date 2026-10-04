@@ -26,7 +26,7 @@ export function Top() {
         <section className="band exhibitions-band">
           <div className="container">
           <SectionHeading en="Exhibitions" center>
-            開催中の展覧会
+            コレクション展
           </SectionHeading>
           {cols.status === "ok" && cols.data.collections.length === 0 && (
             <p className="muted">いまは展覧会がありません。作者から作品を探せます。</p>
