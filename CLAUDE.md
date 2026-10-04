@@ -54,6 +54,7 @@ cd importer
 bundle install
 ruby crawlers/aic.rb           # → importer/crawlers/aic.lmdb        (Art Institute of Chicago)
 ruby crawlers/met.rb           # → importer/crawlers/met.lmdb        (The Metropolitan Museum of Art)
+ruby crawlers/wikimedia.rb     # Wikidata ダンプをストリーム処理 (数時間〜)。作者の生没年は続けて `wikimedia.rb enrich` で取る
 PARIS_TOKEN=xxx ruby crawlers/parismusees.rb  # → importer/crawlers/parismusees.lmdb (GraphQL、要 auth-token)
 
 ruby loader.rb                    # 全ソースを LMDB → hm.db (引数でソース名を絞れる)
@@ -61,7 +62,7 @@ ruby loader.rb cleveland aic      # ソース指定
 ruby loader.rb aic=/path/to.lmdb  # LMDB のパスを明示
 ```
 
-`hm.db` は「生」と「派生」の2層に分かれており、テーブルごとに書き手が1つに固定されている。詳細は `importer/spec_schema.md`。
+`hm.db` は「生」と「派生」の2層に分かれており、テーブルごとに書き手が1つに固定されている。詳細は `importer/docs/spec_schema.md` (設計ドキュメントは `importer/docs/` に集約)。
 
 ```bash
 ruby normalize_dates.rb            # images → image_dates (正規化した制作年)
@@ -70,13 +71,14 @@ ruby apply_translations.rb seed    # 館が持つ原語表記 → image_artist_n
 ruby apply_translations.rb titles  # titles_ja_*.csv → image_translations
 ruby apply_translations.rb artists # artist_names_ja_*.csv → image_artist_names
 ruby apply_translations.rb stale   # 訳出時から原文が変わった行を検出
+ruby normalize_person.rb           # → artists, image_artists.person_key ほか (名寄せ。段階1〜7)
 ```
 
-後半は互いに独立で順不同 (`seed` → `artists` の順序だけは意味がある。館由来の訳を LLM 訳で上書きしないため)。**いずれも LMDB を読まないので数分で終わる**。正規化ルールを直したときに `loader.rb` (Rijksmuseum 込みで30分超) を回し直す必要は無い。
+後半は基本的に互いに独立で順不同。例外は2つ: `seed` → `artists` (館由来の訳を LLM 訳で上書きしないため) と、`normalize_artists.rb` → `normalize_person.rb` (名寄せは `role_bucket` で Sitter/Patron を除いた母数に対して行うため)。**いずれも LMDB を読まないので数分で終わる**。正規化ルールを直したときに `loader.rb` (Rijksmuseum 込みで30分超) を回し直す必要は無い。
 
 #### タイトル日本語訳 (`with_llms/title_translation_batch.rb`)
 
-LLM を使う翻訳・名寄せ判定のスクリプト/プロンプト/Goツールは `importer/with_llms/` にまとめてある。`spec_normalization_title.md` の設計に基づき、`titles_ja_<source>.csv`(こちらも `with_llms/` 配下)を分割して埋めるツール。第1引数のソース名 (`Loaders::SOURCES` のキー) で入力 LMDB も出力 CSV も切り替わる。
+LLM を使う翻訳・名寄せ判定のスクリプト/プロンプト/Goツールは `importer/with_llms/` にまとめてある。`titles_ja_<source>.csv`(こちらも `with_llms/` 配下)を分割して埋めるツール。第1引数のソース名 (`Loaders::SOURCES` のキー) で入力 LMDB も出力 CSV も切り替わる。
 
 ```bash
 ruby with_llms/title_translation_batch.rb sources              # 扱えるソース名の一覧
@@ -88,15 +90,36 @@ ruby with_llms/title_translation_batch.rb cleveland append F   # 翻訳結果JSO
 
 進捗の唯一の状態は CSV そのもの (`source_url` の有無) なので、中断しても再開できる。`next`/`append` のたびに LMDB を全走査すると Rijksmuseum (47 万件の RDF/XML パースで 1 回 30 分超) が成立しないため、対象一覧は `.title_translation_targets_<source>.jsonl` にキャッシュする。**クローラーを再実行して母数が増えたら `scan` で作り直す**こと。実際に翻訳を回すのは `with_llms/title_translator/` (Gemini API) か `with_llms/title_translation_prompt.md` (サブエージェント)。
 
+#### 作者の名寄せ (`normalize_person.rb` / `with_llms/author_merge_batch.rb`)
+
+`normalize_person.rb` は典拠ID (ULAN/Wikidata/VIAF/RKD) を起点に段階1〜6 を機械的に適用し、段階7 として `author_merges.csv` の LLM 判定を適用する。**LLM の判定は作り直せないので `author_merges.csv` が正本**で、DB 側は何度作り直しても失われない。判定は「見逃しより誤統合のほうが高コスト」の非対称で、生没年が不一致なら統合しない。
+
+```bash
+ruby with_llms/author_merge_batch.rb status   # 進捗
+ruby with_llms/author_merge_batch.rb next 30  # 未判定を作品点数の降順で → .author_merge_batch.json
+ruby with_llms/author_merge_batch.rb append F # 判定結果を CSV に追記し DB へ適用
+```
+
+判定の指示は `with_llms/author_migration_prompt.md`、Gemini で回す Go 版は `with_llms/author_merger/`。設計判断は `importer/docs/spec_normalization.md`。
+
 ### finder
 
 ```bash
 cd finder
 go run . index   # 索引 index.db を作る (約 1 分 / 約 270 MB)。hm.db 更新後は作り直す
 go run . serve   # http://127.0.0.1:8081
+go run . collections export   # collections.db → collections/ (git に置くテキスト)
+go run . collections import   # collections/ → collections.db を作り直す
+docker compose up --build     # finder 単体のコンテナ (ルートの docker-compose.yml とは無関係)
 ```
 
+フラグと環境変数の一覧は `finder/README.md`。公開時は `-sql=false` (読み取り専用 SQL コンソールを閉じる) と `-base-path` を使う。
+
 `hm.db` は `mode=ro` で開き、**finder は一切書かない**。finder 自身の派生成果物 (FTS5 索引と解決済みの制作年) は別ファイル `finder/index.db` に置き、接続フックで `ATTACH` して `ix.` で参照する。これは `spec_schema.md` の「テーブルごとに書き手を 1 つに固定する」原則を崩さないための分割で、生の列は毎回 `hm.db` から直接読むため**索引が古くても表示値は古くならない** (古くなるのは検索のヒット範囲と絞り込みの選択肢だけ。画面上部に警告が出る)。
+
+#### コレクション (`finder/collections.db`)
+
+主題別の作品集を finder 上で人手で作る。旧 `collection_generator.rb` と違い**ルールは保存せず、選んだ作品リストだけを保存する**。`collections.db` はリポジトリで唯一「人の手でしか作れない (消したら戻らない)」成果物なので、`hm.db` (書き手固定の原則) にも `index.db` (毎回ゼロから作って rename) にも `cache.db` にも相乗りさせず別ファイルにしてある。`mode=ro` の hm.db 接続に読み書きで `ATTACH` して `co.` で参照する。**ATTACH 先は main の読み取り専用フラグを継承しない**ので、`index.db` の ATTACH には DSN に `mode=ro` を必ず書く。バックアップは `collections export` で git へ。設計は `finder/spec_collections.md`。
 
 欧文と日本語で FTS を分けてある。`unicode61` は CJK を 1 語に切ってしまい「聖母子」から「聖母」を引けないため、日本語だけ `trigram` で別に張っている。詳細は `finder/README.md`。
 
@@ -128,7 +151,14 @@ docker-compose up --build   # http://localhost:8080
 
 ### テスト
 
-テストフレームワークは導入されていない (Ruby 側に rspec/minitest なし、viewer に `@vue/cli-plugin-unit-*` なし)。
+Go 側のみ標準の `go test` がある (`finder/internal/imagecache/`、`importer/with_llms/author_merger/`)。
+
+```bash
+cd finder && go test ./...
+go test ./internal/imagecache -run TestName   # 単体
+```
+
+Ruby (importer/server) と viewer にはテストフレームワークが無い。
 
 ## アーキテクチャ上の要点
 
@@ -139,6 +169,7 @@ docker-compose up --build   # http://localhost:8080
                                                   ↓
                         normalize_dates.rb     → image_dates
                         normalize_artists.rb   → image_artists.role_bucket
+                        normalize_person.rb    → artists, image_artists.person_key
                         apply_translations.rb  → image_translations, image_artist_names
                                                   ↓
                              collection_generator.rb → collections, collection_images
