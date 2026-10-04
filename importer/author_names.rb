@@ -1,4 +1,4 @@
-# 作者名の正規化。normalize_person.rb が使う。
+# 作者名の正規化。normalize_person.rb と with_llms/author_merge_batch.rb が共有する。
 # 判断の根拠は docs/spec_normalization.md。
 
 module AuthorNames

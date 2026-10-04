@@ -7,6 +7,7 @@
 #
 #   段階 1 典拠ID / 2 名前完全一致→典拠 / 3 同一ソース内の同名別ID
 #        4 生没年のパース (統合ではなく検証材料) / 5 ソース間の同名 / 6 区切りの違い
+#        7 LLM の判定 (author_merges.csv が正本。作るのは with_llms/author_merge_batch.rb)
 #
 # role_bucket が non_creator の行を母数から外すので、normalize_artists.rb の後に回す。
 
@@ -15,6 +16,7 @@ require "set"
 require_relative "db"
 require_relative "loaders"
 require_relative "author_names"
+require_relative "author_merges"
 include AuthorNames
 
 # ---------------------------------------------------------------- 典拠ID
@@ -395,6 +397,36 @@ def merge_people(people, placeholder_pairs)
   [uf, matches]
 end
 
+# 段階7: author_merges.csv の判定を段階1〜6 の結果に重ねる。
+# CSV は person_key を参照しているので、いま算出したキーから pid を逆引きする。
+def apply_llm_merges(people, uf, keys, matches)
+  by_key = Hash.new { |h, k| h[k] = [] }
+  keys.each { |pid, key| by_key[key] << pid }
+
+  mapping, skipped = AuthorMerges.resolve(by_key.keys.to_set)
+  details = AuthorMerges.details
+
+  mapping.each { |from, into|
+    pids = by_key[from]
+    target = by_key[into].first
+    next if pids.empty? || target.nil?
+
+    detail = details[from]
+    pids.each { |pid|
+      uf.union(pid, target)
+      # 「なぜこの人物がこのクラスタに入ったか」を上書きするのは、段階1〜6 では
+      # 統合されていなかった (単独だった) 場合だけにする。機械ルールで既に
+      # まとまっていた分の理由は残す。
+      current = matches[pid]
+      next if current && !%w[source_id none].include?(current.method)
+
+      matches[pid] = Match.new("llm", detail&.dig("confidence"), detail&.dig("reason"))
+    }
+  }
+
+  [mapping.size, skipped.size]
+end
+
 # クラスタごとの person_key を決める。典拠IDがあればその代表、無ければメンバーから
 # 決定的に選んだアンカー。
 def person_keys(people, uf)
@@ -523,6 +555,15 @@ STDERR.puts "名寄せ中..."
 uf, matches = merge_people(people, placeholder_pairs)
 keys = person_keys(people, uf)
 STDERR.puts "  段階1〜6: #{keys.values.uniq.size}人 (統合前 #{people.size}人物)"
+
+# 段階7: LLM の判定 (author_merges.csv)。段階1〜6 の結果に対する追加の統合として
+# 適用する。CSV が正本なので、このスクリプトを何度回しても判定は失われない。
+applied, skipped = apply_llm_merges(people, uf, keys, matches)
+if applied > 0 || skipped > 0
+  keys = person_keys(people, uf)
+  STDERR.puts "  段階7 (LLM): #{applied}件を適用 → #{keys.values.uniq.size}人" \
+              "#{skipped > 0 ? " / キーが解決できず読み飛ばし #{skipped}件" : ''}"
+end
 
 write_back(db, people, keys, matches)
 rebuild_artists(db, people, keys)
