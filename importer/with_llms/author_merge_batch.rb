@@ -1,8 +1,8 @@
 #!/usr/bin/env ruby
 
 # 名寄せできなかった作者を LLM に判定させるためのバッチツール。
-# サブエージェントへの指示は author_migration_prompt.md、設計は
-# spec_normalization_author.md の「名寄せの実行順序と各段階の信頼度(実測)」。
+# サブエージェントへの指示は author_migration_prompt.md、設計判断は
+# docs/spec_normalization.md の「作者の名寄せ」。
 #
 #   ruby author_merge_batch.rb status        進捗
 #   ruby author_merge_batch.rb next 30       未判定を30件取り出し .author_merge_batch.json へ

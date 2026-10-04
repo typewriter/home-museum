@@ -1,8 +1,8 @@
 #!/usr/bin/env ruby
 
 # image_artists の person_key / match_method / match_confidence / match_reason と
-# artists テーブルを埋める。設計は spec_normalization_author.md 「名寄せの実行順序と
-# 各段階の信頼度(実測)」および「名寄せ結果の記録」。
+# artists テーブルを埋める。設計判断は docs/spec_normalization.md
+# の「作者の名寄せ」。
 #
 #   ruby normalize_person.rb
 #

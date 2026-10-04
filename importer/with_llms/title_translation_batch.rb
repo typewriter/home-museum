@@ -1,4 +1,4 @@
-# 日本語タイトルCSV (spec_normalization_title.md) を分割して埋めるためのバッチ管理ツール。
+# 日本語タイトルCSV (docs/spec_normalization.md) を分割して埋めるためのバッチ管理ツール。
 #
 #   ruby title_translation_batch.rb SOURCE status       進捗を表示
 #   ruby title_translation_batch.rb SOURCE next [N]     未翻訳の先頭N件を batch.json に書き出す (既定20)

@@ -1,5 +1,5 @@
 # 作者名の正規化。normalize_person.rb と with_llms/author_merge_batch.rb が共有する。
-# 判断の根拠 (なぜソースごとに括弧の扱いを変えるか等) は spec_normalization_author.md。
+# 判断の根拠 (なぜソースごとに括弧の扱いを変えるか等) は docs/spec_normalization.md。
 
 module AuthorNames
   # 典拠の代表を選ぶ優先順位。ULAN を先頭にしているのは美術分野で最も網羅的なため。

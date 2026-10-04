@@ -1,7 +1,7 @@
 #!/usr/bin/env ruby
 
 # 外部で作った訳を hm.db に適用する。CSV 側が真の source of truth で、
-# DB 側はいつでも作り直せる。設計は spec_normalization_title.md / spec_schema.md。
+# DB 側はいつでも作り直せる。設計は docs/spec_normalization.md / docs/spec_schema.md。
 #
 #   ruby apply_translations.rb titles [SOURCE ...]    titles_ja_<source>.csv  → image_translations
 #   ruby apply_translations.rb seed                   館が持つ原語表記        → image_artist_names

@@ -10,7 +10,7 @@
                                               [normalize_*.rb]─┘
 ```
 
-クロール結果は生 JSON のまま LMDB に溜め、`loader.rb` が共通スキーマへ変換して `hm.db` に入れる。日本語訳や正規化した年・作者は**別テーブル**に分かれていて、それぞれ専用スクリプトが後から埋める。設計の理由は [`spec_schema.md`](spec_schema.md)。
+クロール結果は生 JSON のまま LMDB に溜め、`loader.rb` が共通スキーマへ変換して `hm.db` に入れる。日本語訳や正規化した年・作者は**別テーブル**に分かれていて、それぞれ専用スクリプトが後から埋める。設計の理由は [`spec_schema.md`](docs/spec_schema.md)。
 
 ## セットアップ
 
@@ -63,13 +63,13 @@ ruby loader.rb aic=/path/to.lmdb  # LMDB のパスを明示
 
 | コマンド | 書くもの | 内容 |
 |---|---|---|
-| `ruby normalize_dates.rb [SOURCE...]` | `image_dates` | 制作年を `date_start` / `date_end` / `date_precision` に。仕様は [`spec_normalization_year.md`](spec_normalization_year.md) |
-| `ruby normalize_artists.rb [SOURCE...]` | `image_artists.role_bucket` | 役割を `creator` / `creator_uncertain` / `after` / `non_creator` に分類。Sitter や Patron を作者から外すのが主目的。仕様は [`spec_normalization_author.md`](spec_normalization_author.md) |
+| `ruby normalize_dates.rb [SOURCE...]` | `image_dates` | 制作年を `date_start` / `date_end` / `date_precision` に |
+| `ruby normalize_artists.rb [SOURCE...]` | `image_artists.role_bucket` | 役割を `creator` / `creator_uncertain` / `after` / `non_creator` に分類。Sitter や Patron を作者から外すのが主目的 |
 | `ruby apply_translations.rb seed` | `image_artist_names` | 館が持つ原語表記(Cleveland の漢字名)を日本語名として取り込む |
 | `ruby apply_translations.rb titles [SOURCE...]` | `image_translations` | `titles_ja_<source>.csv` を適用 |
 | `ruby apply_translations.rb artists [SOURCE...]` | `image_artist_names` | `artist_names_ja_<source>.csv` を適用 |
 | `ruby apply_translations.rb stale` | (表示のみ) | 訳出時から原文が変わった行を検出 |
-| `ruby normalize_person.rb` | `artists`, `image_artists.person_key` ほか3列 | 同一人物の名寄せ。典拠ID (ULAN/Wikidata/VIAF/RKD) を起点に段階1〜7 を適用する。仕様は [`spec_normalization_author.md`](spec_normalization_author.md) |
+| `ruby normalize_person.rb` | `artists`, `image_artists.person_key` ほか3列 | 同一人物の名寄せ。典拠ID (ULAN/Wikidata/VIAF/RKD) を起点に段階1〜7 を適用する |
 | `ruby with_llms/author_merge_batch.rb status \| next N \| append F` | `author_merges.csv`, 上の3列 | 機械ルールで統合できなかった作者を LLM に判定させる (段階7)。指示は [`with_llms/author_migration_prompt.md`](with_llms/author_migration_prompt.md) |
 
 引数の `SOURCE` は `aic` / `met` / `parismusees` / `rijksmuseum` / `smithsonian` / `cleveland` / `wikimedia`。省略すると全ソース。
@@ -116,10 +116,11 @@ ruby with_llms/title_translation_batch.rb cleveland append F # 翻訳結果 JSON
 **クロールし直したとき**
 
 ```bash
-ruby cleveland.rb                    # 時間がかかる。中断可
+ruby crawlers/cleveland.rb          # 時間がかかる。中断可
 ruby loader.rb cleveland
 ruby normalize_dates.rb cleveland
 ruby normalize_artists.rb cleveland
+ruby normalize_person.rb             # normalize_artists.rb より後。全ソース横断なので引数なし
 ruby apply_translations.rb seed
 ruby apply_translations.rb titles cleveland
 ruby with_llms/title_translation_batch.rb cleveland scan   # 母数が増えたので作り直す
@@ -176,15 +177,13 @@ select coalesce(t.text, i.title) as title,
 
 | ファイル | 内容 |
 |---|---|
-| [`spec_schema.md`](spec_schema.md) | テーブルの分け方、書き手の固定、決定した設計上の分岐 |
-| [`spec_normalization_title.md`](spec_normalization_title.md) | タイトル日本語訳の方針と各館の表記ゆれ調査 |
-| [`spec_normalization_year.md`](spec_normalization_year.md) | 制作年のパターン別マッピングと BCE の扱い |
-| [`spec_normalization_author.md`](spec_normalization_author.md) | 作者の役割分類、名寄せ (未実装)、各館の作者データ調査 |
+| [`spec_schema.md`](docs/spec_schema.md) | テーブルの分け方、書き手の固定、決定した設計上の分岐 |
+| [`spec_normalization.md`](docs/spec_normalization.md) | 制作年・作者の役割・名寄せ・日本語訳の設計判断 (なぜそうしたか / しなかったか) |
 
 ## 注意点
 
 - `*.lmdb/` と `*.db` はリポジトリに含めない (`.gitignore` 済み)。LLM の成果物 (`with_llms/titles_ja_*.csv`、`author_merges.csv`) も作り直せない正本だが、ローカルに置いて追跡しない。消さないこと
 - `sqlite3` gem は 2.x。`execute` へのバインド変数は可変長引数ではなく**配列**で渡す
 - SQLite では二重引用符は文字列ではなく**識別子**を意味する。`where method = "source"` は `images.source` 列との比較になってしまうので、文字列リテラルには単一引用符を使う
-- 名寄せ (同一人物の統合) は未実装。作者名の日本語訳はエントリ単位なので、名寄せ無しでも表示は成立する
+- 作者名の日本語訳は名寄せ (`person_key`) ではなく作者エントリ単位にぶら下げてある。名寄せのルールを直して `person_key` が変わっても訳は失われない
 - `crawlers/*.rb` はいずれも `require_relative '../kv_store'` で `importer/kv_store.rb` を見る (クローラーを `crawlers/` へ移した際に相対パスの更新が漏れていたバグを wikimedia.rb 追加時に修正した)

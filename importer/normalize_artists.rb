@@ -1,6 +1,6 @@
 #!/usr/bin/env ruby
 
-# image_artists.role_bucket を埋める。設計は spec_normalization_author.md。
+# image_artists.role_bucket を埋める。設計判断は docs/spec_normalization.md。
 #
 #   ruby normalize_artists.rb            全件
 #   ruby normalize_artists.rb cleveland  ソース指定
