@@ -1,19 +1,20 @@
 /*
- * 公開画面。作品が主役なので、サイトの色はモノトーンだけにする。
+ * 公開画面。作品が主役なので、サイトの色はモノトーンだけにし、美術館の展示室の
+ * ように黒を地にする。展示室 (1 作品ずつ見る画面) は一覧より一段暗くする。
  * 区切りは罫線ではなく余白と面 (薄い灰色の塗り) で付ける。
  * 文字の大きさと余白は下の段階からしか選ばない。同じ役割の要素が
  * どのページでも同じ見た目で繰り返されるように。
  */
 :root {
-  --ink: #111;
-  --ink-2: #555;
-  --ink-3: #8a8a8a;
-  --paper: #fff;
-  --tone: #f3f3f3;
-  --room: #0d0d0d;
-  --room-ink: #ededed;
-  --room-ink-2: #9a9a9a;
-  --room-tone: #1a1a1a;
+  --ink: #ebebeb;
+  --ink-2: #a6a6a6;
+  --ink-3: #767676;
+  --paper: #0e0e0e;
+  --tone: #1b1b1b;
+  --room: #070707;
+  --room-ink: #ebebeb;
+  --room-ink-2: #8f8f8f;
+  --room-tone: #161616;
 
   --font: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
 
@@ -29,11 +30,11 @@
   --s3: 16px;
   --s4: 24px;
   --s5: 40px;
-  --s6: 64px;
-  --s7: 112px;
+  --s6: 48px;
+  --s7: 80px;
 
   --gutter: 40px;
-  color-scheme: light;
+  color-scheme: dark;
 }
 
 * {
@@ -139,7 +140,7 @@ button {
   font-size: var(--fs-xl);
   font-weight: 500;
   letter-spacing: 0.04em;
-  margin-bottom: var(--s5);
+  margin-bottom: var(--s4);
 }
 
 .button {
@@ -153,7 +154,7 @@ button {
 }
 
 .button:hover {
-  background: #3a3a3a;
+  background: #c4c4c4;
 }
 
 .artwork-placeholder {
@@ -171,7 +172,7 @@ button {
 /* ---- トップ ---- */
 
 .intro {
-  padding-top: var(--s6);
+  padding-top: var(--s5);
 }
 
 /* 見出しを文節の途中で折り返さない (改行位置は <wbr> で決める) */
@@ -188,7 +189,7 @@ button {
 .card-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: var(--s6) var(--s4);
+  gap: var(--s5) var(--s4);
 }
 
 .card-image {
@@ -323,7 +324,7 @@ button {
   padding: 0;
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: var(--s6) var(--s4);
+  gap: var(--s5) var(--s4);
 }
 
 .catalog-item {
@@ -382,8 +383,8 @@ button {
 @media (max-width: 760px) {
   :root {
     --gutter: 20px;
-    --s6: 48px;
-    --s7: 80px;
+    --s6: 36px;
+    --s7: 56px;
   }
   .lead {
     font-size: var(--fs-m);
