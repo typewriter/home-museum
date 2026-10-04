@@ -162,6 +162,25 @@ func (c *Cache) status(ctx context.Context, e Entry) (Status, error) {
 	return st, nil
 }
 
+// ReadyKey は保管済みなら保管先のキーを返す。積まないので、表示のたびに呼んでよい。
+func (c *Cache) ReadyKey(ctx context.Context, sourceURL string, width int) (string, bool, error) {
+	h := Hash(sourceURL)
+	e, ok, err := c.lookup(ctx, h)
+	if err != nil || !ok || !e.HasVariant(width) {
+		return "", false, err
+	}
+	return Key(e.Source, h, width), true, nil
+}
+
+// Presigner は保管先が署名付き URL を作れるなら返す。
+func (c *Cache) Presigner() (Presigner, bool) {
+	p, ok := c.store.(Presigner)
+	return p, ok
+}
+
+// Widths は生成するサイズ。
+func (c *Cache) Widths() []int { return c.widths }
+
 // Open は保存済みの画像を読む。無ければ ErrNotFound。
 func (c *Cache) Open(ctx context.Context, r Ref, width int) (io.ReadCloser, int64, error) {
 	h := Hash(r.SourceURL)
