@@ -29,6 +29,7 @@ func (s *Server) routeAdminAPI() {
 	h("PUT /api/admin/collections/{id}/order", s.adminSetOrder)
 	h("GET /api/admin/artists", s.adminArtists)
 	h("GET /api/admin/artists/{key}", s.adminArtistWorks)
+	h("GET /api/admin/works", s.adminSearchWorks)
 	h("GET /api/admin/stats", s.adminStats)
 	// 管理画面で選んでいる作品のサムネは、閲覧者より先に取りに行く。
 	h("GET /api/admin/img/{id}/{w}", s.handleImage(imagecache.PriorityAdmin))
@@ -240,6 +241,26 @@ func (s *Server) adminArtistWorks(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"exhibition": ex, "page": page, "per": catalogPer, "works": works,
+	})
+}
+
+func (s *Server) adminSearchWorks(w http.ResponseWriter, r *http.Request) {
+	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+	if page < 1 {
+		page = 1
+	}
+	cards, more, err := s.st.SearchWorks(r.Context(), r.URL.Query().Get("q"), page, catalogPer)
+	if err != nil {
+		serverError(w, r, err)
+		return
+	}
+	works, err := s.st.WithCollections(r.Context(), cards)
+	if err != nil {
+		serverError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"page": page, "per": catalogPer, "has_more": more, "works": works,
 	})
 }
 

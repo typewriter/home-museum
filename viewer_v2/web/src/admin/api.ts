@@ -90,5 +90,10 @@ export const admin = {
     getJSON<{ exhibition: Exhibition; page: number; per: number; works: AdminWork[] }>(
       "/api/admin/artists/" + encodeURIComponent(key) + "?page=" + page,
     ),
+  searchWorks: (q: string, page: number, signal?: AbortSignal) =>
+    getJSON<{ page: number; per: number; has_more: boolean; works: AdminWork[] }>(
+      "/api/admin/works?q=" + encodeURIComponent(q) + "&page=" + page,
+      { signal },
+    ),
   stats: () => getJSON<{ enabled: boolean; stats?: { by_source: SourceStat[] | null } }>("/api/admin/stats"),
 };

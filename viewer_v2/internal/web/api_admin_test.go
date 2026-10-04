@@ -182,3 +182,30 @@ func TestAdminAddQueuesImagesAtCollectionPriority(t *testing.T) {
 		}
 	}
 }
+
+func TestAdminSearchWorksByTitle(t *testing.T) {
+	f := newDBFixture(t)
+	var r struct {
+		Works []struct {
+			ID          int64   `json:"id"`
+			Collections []int64 `json:"collections"`
+		} `json:"works"`
+		HasMore bool `json:"has_more"`
+	}
+	getJSON(t, f, "/api/admin/works?q="+url.QueryEscape("睡蓮"), 200, &r)
+	if len(r.Works) != 1 || r.Works[0].ID != 1 || len(r.Works[0].Collections) != 1 {
+		t.Errorf("日本語訳で引ける: %+v", r.Works)
+	}
+	getJSON(t, f, "/api/admin/works?q=print", 200, &r)
+	if len(r.Works) != 2 || r.HasMore {
+		t.Errorf("原題の大文字小文字を区別しない: %+v", r)
+	}
+	getJSON(t, f, "/api/admin/works?q=100%25", 200, &r)
+	if len(r.Works) != 0 {
+		t.Errorf("%% はワイルドカードにしない: %+v", r.Works)
+	}
+	getJSON(t, f, "/api/admin/works?q=+", 200, &r)
+	if len(r.Works) != 0 {
+		t.Errorf("空白だけなら何も返さない: %+v", r.Works)
+	}
+}

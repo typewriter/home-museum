@@ -288,3 +288,27 @@ func (s *Store) WithCollections(ctx context.Context, cards []WorkCard) ([]AdminW
 	}
 	return out, nil
 }
+
+// SearchWorks は作品名 (原題と日本語訳) への部分一致。管理画面でコレクションに
+// 入れる作品を探すため。180 万件への LIKE は全走査で 1 秒弱かかる (実測) が、
+// 管理画面だけの用途なので FTS の索引は張らない。hasMore は次のページがあるか。
+func (s *Store) SearchWorks(ctx context.Context, q string, page, per int) (cards []WorkCard, hasMore bool, err error) {
+	q = strings.TrimSpace(q)
+	if q == "" {
+		return []WorkCard{}, false, nil
+	}
+	if page < 1 {
+		page = 1
+	}
+	like := "%" + escapeLike(q) + "%"
+	cards, err = scanCards(s.r.QueryContext(ctx, `SELECT `+cardCols+` FROM works w
+		WHERE w.title LIKE ? ESCAPE '\' OR w.title_ja LIKE ? ESCAPE '\'
+		ORDER BY w.id LIMIT ? OFFSET ?`, like, like, per+1, (page-1)*per))
+	if err != nil {
+		return nil, false, err
+	}
+	if len(cards) > per {
+		return cards[:per], true, nil
+	}
+	return cards, false, nil
+}
