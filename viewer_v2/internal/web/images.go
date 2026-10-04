@@ -24,8 +24,8 @@ const presignWindow = 24 * time.Hour
 // placeholderSVG は未取得のときに 202 とともに返す絵。<img> にそのまま入るので、
 // ページ側は特別扱いせずに済む。
 const placeholderSVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" width="400" height="300">
-<rect width="400" height="300" fill="#1b1b1d"/>
-<text x="200" y="150" fill="#8a8a90" font-family="sans-serif" font-size="15"
+<rect width="400" height="300" fill="#1c1c1c"/>
+<text x="200" y="150" fill="#8f8f8f" font-family="sans-serif" font-size="15"
  text-anchor="middle">%s</text></svg>`
 
 func writePlaceholder(w http.ResponseWriter, code int, msg string) {
