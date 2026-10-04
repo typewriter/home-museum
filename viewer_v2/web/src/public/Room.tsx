@@ -139,7 +139,7 @@ function Caption({ work: w }: { work: Work }) {
           {sourceNames[w.source] ?? w.source}で見る ↗
         </a>
       </p>
-      <p className="caption-hint">← → キー、またはスワイプで移動 / Esc で入口へ</p>
+      <p className="caption-hint">← → キー、またはスワイプで移動 / Esc で戻る</p>
     </section>
   );
 }

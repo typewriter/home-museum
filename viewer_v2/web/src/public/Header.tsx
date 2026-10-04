@@ -1,12 +1,18 @@
 import { Link } from "../shared/router";
 
-export function Header() {
+// back を付けたページ (トップ以外) では、サイト名の下にトップへの戻り道を出す。
+export function Header({ back }: { back?: boolean }) {
   return (
     <header className="site-header">
       <div className="container">
         <Link to="/" className="site-name">
           おうちの美術館
         </Link>
+        {back && (
+          <nav className="breadcrumb" aria-label="パンくずリスト">
+            <Link to="/">← トップページへ戻る</Link>
+          </nav>
+        )}
       </div>
     </header>
   );

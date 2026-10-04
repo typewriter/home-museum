@@ -6,7 +6,7 @@ export function NotFoundPage() {
   useTitle("見つかりません");
   return (
     <>
-      <Header />
+      <Header back />
       <main className="container page notfound">
         <p className="eyebrow">Not Found</p>
         <h1 className="display">見つかりません</h1>

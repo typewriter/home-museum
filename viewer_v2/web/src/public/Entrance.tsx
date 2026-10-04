@@ -23,11 +23,11 @@ export function Entrance({ kind, exKey, page }: Props) {
   if (st.status === "error")
     return (
       <>
-        <Header />
+        <Header back />
         <p className="container page muted">読み込めませんでした。</p>
       </>
     );
-  if (st.status === "loading") return <Header />;
+  if (st.status === "loading") return <Header back />;
 
   const { exhibition: ex, works, per } = st.data;
   const pages = Math.max(1, Math.ceil(ex.total / per));
@@ -35,24 +35,26 @@ export function Entrance({ kind, exKey, page }: Props) {
 
   return (
     <>
-      <Header />
+      <Header back />
       <main>
         <section className="band entrance-band">
         <div className="container entrance">
           <div className="entrance-image">
             {ex.cover_id != null && (
-              <Artwork key={ex.cover_id} id={ex.cover_id} width={1600} alt="" className="entrance-cover" eager />
+              <Link to={base + "/1"} aria-label="大きく表示する" className="entrance-cover-link">
+                <Artwork key={ex.cover_id} id={ex.cover_id} width={1600} alt="" className="entrance-cover" eager />
+              </Link>
             )}
           </div>
           <div className="entrance-text">
-            <p className="eyebrow">{kind === "collection" ? "Exhibition" : "Artist"}</p>
+            <p className="eyebrow">{kind === "collection" ? "Virtual Collection Exhibition" : "Artist"}</p>
             <h1 className="display">{ex.title}</h1>
             {ex.subtitle && <p className="subtitle">{ex.subtitle}</p>}
             {ex.description && <p className="description">{ex.description}</p>}
-            <p className="meta">出品 {ex.total} 点</p>
+            <p className="meta">作品 {ex.total} 点</p>
             {ex.total > 0 && (
               <Link to={base + "/1"} className="button">
-                展示室に入る
+                大きく表示する
               </Link>
             )}
           </div>
@@ -60,7 +62,7 @@ export function Entrance({ kind, exKey, page }: Props) {
         </section>
 
         <section className="container section page">
-          <SectionHeading en="Catalogue">出品作品</SectionHeading>
+          <SectionHeading en="Works">作品</SectionHeading>
           <ol className="catalog" start={(page - 1) * per + 1}>
             {works.map((w, i) => {
               const n = (page - 1) * per + i + 1;
