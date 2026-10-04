@@ -88,7 +88,7 @@ func main() {
 	log.SetFlags(log.Ltime)
 
 	var opt options
-	flag.StringVar(&opt.source, "source", "", "対象ソース名 (aic|met|parismusees|rijksmuseum|smithsonian|cleveland)")
+	flag.StringVar(&opt.source, "source", "", "対象ソース名 (aic|met|parismusees|rijksmuseum|smithsonian|cleveland|wikimedia)")
 	flag.StringVar(&opt.importerDir, "importer", "..", "title_translation_batch.rb のあるディレクトリ")
 	flag.StringVar(&opt.outDir, "out", "", "翻訳結果JSONの出力先 (既定: <importer>/scratch/translations)")
 	flag.StringVar(&opt.rubyBin, "ruby", "ruby", "ruby コマンド")

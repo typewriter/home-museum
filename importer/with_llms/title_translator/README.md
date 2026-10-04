@@ -1,7 +1,7 @@
 # title_translator
 
 `title_translation_batch.rb` と Gemini API を繋ぎ、タイトル日本語訳 CSV
-(`importer/titles_ja_<source>.csv`) をバッチで埋めるツール。
+(`importer/with_llms/titles_ja_<source>.csv`) をバッチで埋めるツール。
 
 ## 前提
 
@@ -11,8 +11,8 @@
 
 ## 実行
 
-対象の美術館は `-source` で指定する。入力 LMDB (`<source>.lmdb`) も出力 CSV
-(`titles_ja_<source>.csv`) もこの名前から決まる。取り違えると別ソースの CSV に
+対象の美術館は `-source` で指定する。入力 LMDB (`crawlers/<source>.lmdb`) も出力 CSV
+(`with_llms/titles_ja_<source>.csv`) もこの名前から決まる。取り違えると別ソースの CSV に
 追記してしまうため既定値は無く、未指定はエラーになる。
 
 ```bash
@@ -21,7 +21,7 @@ GEMINI_API_KEY=xxx go run . -source cleveland -batches 10 -size 50
 ```
 
 指定できる名前は `ruby ../title_translation_batch.rb sources` で確認できる
-(`aic` / `met` / `parismusees` / `rijksmuseum` / `smithsonian` / `cleveland`)。
+(`aic` / `met` / `parismusees` / `rijksmuseum` / `smithsonian` / `cleveland` / `wikimedia`)。
 
 まず少件数で出力を確かめる場合は `-dry-run` を使う (CSV には追記せず、翻訳結果 JSON
 を書いたところで止まる)。
@@ -57,8 +57,8 @@ RDF/XML を1件ずつパースするので、ここだけ数十分かかる (先
 | `-temperature` | `1.0` | 生成温度。思考モデルは低温にすると反復・ループを起こしうるため、既定値のままを推奨 |
 | `-attempts` | `3` | 1バッチあたりのAPI試行回数の上限 |
 | `-dry-run` | `false` | 翻訳結果JSONを書くところまでで停止し、CSVへ追記しない |
-| `-importer` | `..` | `title_translation_batch.rb` のあるディレクトリ |
-| `-out` | `<importer>/scratch/translations/<source>` | 翻訳結果JSONの出力先 |
+| `-importer` | `..` | `title_translation_batch.rb` のあるディレクトリ (既定はこの1つ上、つまり `importer/with_llms/`) |
+| `-out` | `<importer>/scratch/translations/<source>` | 翻訳結果JSONの出力先 (既定は `with_llms/scratch/translations/<source>`。.gitignore 済み) |
 | `-ruby` | `ruby` | ruby コマンド |
 
 ## 1バッチの流れ
@@ -70,7 +70,9 @@ ruby title_translation_batch.rb S append F → titles_ja_S.csv へ追記
 ```
 
 - 翻訳方針と `confidence` の基準は `prompt.md` に置き、`go:embed` で system instruction
-  として送っている。訳し方を変えたいときはこのファイルを編集する。
+  として送っている。訳し方を変えたいときはこのファイルを編集する。**埋め込みなので、
+  ビルド済みの `./title_translator` を直に実行すると編集が効かない**。`go run .` で回すか、
+  `prompt.md` を触ったら `go build .` で入れ直すこと。
 - レスポンスは入力の `source_url` 集合と突き合わせ、欠落・空訳・不正な `confidence` を
   弾いたうえで、**残った件だけを入力にして訊き直す** (`-attempts` 回まで、5秒刻みの
   バックオフ)。全件揃わなければそのバッチは中断し、CSV には一切書かない。
