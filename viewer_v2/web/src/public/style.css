@@ -105,7 +105,7 @@ button {
 .site-name {
   font-size: var(--fs-l);
   font-weight: 500;
-  letter-spacing: 0.24em;
+  letter-spacing: 0.16em;
 }
 
 .eyebrow {
@@ -172,6 +172,17 @@ button {
 
 .intro {
   padding-top: var(--s6);
+}
+
+/* 見出しを文節の途中で折り返さない (改行位置は <wbr> で決める) */
+.intro .display {
+  word-break: keep-all;
+}
+
+.intro-note {
+  margin-top: var(--s3);
+  font-size: var(--fs-s);
+  color: var(--ink-3);
 }
 
 .card-grid {

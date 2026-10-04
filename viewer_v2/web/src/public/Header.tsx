@@ -5,7 +5,7 @@ export function Header() {
     <header className="site-header">
       <div className="container">
         <Link to="/" className="site-name">
-          Uchibi
+          おうちの美術館
         </Link>
       </div>
     </header>

@@ -20,7 +20,7 @@ export function AdminApp() {
     <div className="admin">
       <header className="admin-header">
         <Link to="/admin" className="admin-brand">
-          Uchibi 管理
+          おうちの美術館 管理
         </Link>
         <nav>
           <Link to="/admin">コレクション</Link>

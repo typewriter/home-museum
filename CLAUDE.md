@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## プロジェクト概要
 
-Uchibi (Home museum) — パブリックドメインの美術作品を、展覧会のように作者別・コレクション別に見せる Web サービス。独立したコンポーネント 2 つで構成される。
+おうちの美術館 (Uchibi, Home museum) — パブリックドメインの美術作品を、展覧会のように作者別・コレクション別に見せる Web サービス。独立したコンポーネント 2 つで構成される。
 
 | ディレクトリ | 役割 | 技術 |
 | --- | --- | --- |

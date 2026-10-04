@@ -14,8 +14,8 @@ import (
 )
 
 const (
-	siteName        = "Uchibi"
-	siteDescription = "美術作品を、展覧会のように画面いっぱいに。"
+	siteName        = "おうちの美術館"
+	siteDescription = "気軽に楽しむ、名画の世界。"
 )
 
 // spa は Vite がビルドした dist/ を配る。

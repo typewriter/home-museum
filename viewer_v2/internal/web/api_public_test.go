@@ -155,18 +155,18 @@ func TestSPAInjectsMeta(t *testing.T) {
 
 	rec := f.get(t, "/c/pub")
 	body := rec.Body.String()
-	if rec.Code != 200 || !strings.Contains(body, `<meta property="og:title" content="睡蓮と積みわら | Uchibi">`) ||
+	if rec.Code != 200 || !strings.Contains(body, `<meta property="og:title" content="睡蓮と積みわら | おうちの美術館">`) ||
 		!strings.Contains(body, `<meta property="og:image" content="http://example.com/img/2/1600">`) {
 		t.Errorf("code=%d body=%s", rec.Code, body)
 	}
 
 	rec = f.get(t, "/c/pub/2")
-	if !strings.Contains(rec.Body.String(), "<title>睡蓮 — 睡蓮と積みわら | Uchibi</title>") {
+	if !strings.Contains(rec.Body.String(), "<title>睡蓮 — 睡蓮と積みわら | おうちの美術館</title>") {
 		t.Errorf("展示室は作品名: %s", rec.Body)
 	}
 
 	for _, p := range []string{"/c/draft", "/a/ulan:2", "/c/pub/9", "/nope"} {
-		if rec := f.get(t, p); rec.Code != http.StatusNotFound || !strings.Contains(rec.Body.String(), "<title>Uchibi</title>") {
+		if rec := f.get(t, p); rec.Code != http.StatusNotFound || !strings.Contains(rec.Body.String(), "<title>おうちの美術館</title>") {
 			t.Errorf("%s: code = %d, want 404 で SPA を返す", p, rec.Code)
 		}
 	}

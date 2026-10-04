@@ -15,8 +15,10 @@ export function Top() {
       <Header />
       <main className="container page">
         <section className="intro">
-          <h1 className="display">美術作品を、展覧会のように。</h1>
-          <p className="lead">世界の美術館が公開しているパブリックドメインの作品を、テーマや作者ごとに一点ずつ。</p>
+          <h1 className="display">
+            気軽に楽しむ、<wbr />名画の世界
+          </h1>
+          <p className="intro-note">※当サイトの作品は、すべてパブリックドメイン（著作権の切れたもの）です。</p>
         </section>
 
         <section className="section">
