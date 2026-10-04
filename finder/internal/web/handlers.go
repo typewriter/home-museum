@@ -3,6 +3,7 @@ package web
 import (
 	"context"
 	"errors"
+	"log"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -56,6 +57,9 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 		"Facets": s.facets(ctx),
 		"Query":  r.URL.Query(),
 		"Person": person,
+		// 一覧のサムネは既定で出さない。1 ページ 50 件を一度に要求すると
+		// 館ごと 10 秒では埋まるのに数分かかる (spec_image_cache.md §8)。
+		"Thumbs": s.cache != nil && qBool(r, "thumbs"),
 	})
 }
 
@@ -149,7 +153,17 @@ func (s *Server) handleStats(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, http.StatusInternalServerError, err)
 		return
 	}
-	s.render(w, r, "stats.html", "カバレッジ", "stats", map[string]any{"S": st, "ComputedAt": at})
+	data := map[string]any{"S": st, "ComputedAt": at}
+	// 画像キャッシュの状況は cache.db だけ見るので軽い。毎回数える。
+	if s.cache != nil {
+		if cs, err := s.cache.Stats(ctx); err != nil {
+			log.Printf("画像キャッシュの集計に失敗: %v", err)
+		} else {
+			data["Cache"] = cs
+			data["CacheDesc"] = s.cache.Describe()
+		}
+	}
+	s.render(w, r, "stats.html", "カバレッジ", "stats", data)
 }
 
 // stats はカバレッジ計算をキャッシュする。images と image_artists の全走査を

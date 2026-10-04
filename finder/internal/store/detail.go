@@ -178,6 +178,31 @@ func (s *Store) WorkDetail(ctx context.Context, id int64) (*WorkDetail, error) {
 	return d, nil
 }
 
+// ImageSource は画像キャッシュが 1 枚を取りに行くのに要る最小限の情報。
+type ImageSource struct {
+	ID        int64
+	Source    string
+	SourceURL string
+	ImageURL  string
+}
+
+// ImageSource は id から取得元を引く。見つからなければ (nil, nil)。
+func (s *Store) ImageSource(ctx context.Context, id int64) (*ImageSource, error) {
+	var r ImageSource
+	var img sql.NullString
+	err := s.DB.QueryRowContext(ctx,
+		`SELECT id, source, source_url, image_url FROM images WHERE id = ?`, id).
+		Scan(&r.ID, &r.Source, &r.SourceURL, &img)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	r.ImageURL = nullStr(img)
+	return &r, nil
+}
+
 // ArtistRow は作者一覧の 1 行。
 type ArtistRow struct {
 	PersonKey   string

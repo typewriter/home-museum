@@ -90,6 +90,9 @@
         </select>
       </label>
       <label class="chk"><input type="checkbox" name="raw" value="1" {{if $p.Raw}}checked{{end}}> FTS5 の式をそのまま渡す</label>
+      {{if $.Images}}
+      <label class="chk"><input type="checkbox" name="thumbs" value="1" {{if $d.Thumbs}}checked{{end}}> サムネイルを出す</label>
+      {{end}}
     </div>
   </details>
   {{if $p.PersonKey}}<input type="hidden" name="person_key" value="{{$p.PersonKey}}">{{end}}
@@ -108,16 +111,25 @@
 </p>
 
 {{if $res.Rows}}
+{{if $d.Thumbs}}
+<p class="banner note">サムネイルを表示すると、このページ分 ({{len $res.Rows}} 件) が取得キューに積まれます。
+  館ごと 10 秒に 1 回しか取りに行かないので、埋まるまで数分かかります。</p>
+{{end}}
 
 <div class="tablewrap">
 <table class="grid works">
   <thead><tr>
+    {{if $d.Thumbs}}<th></th>{{end}}
     <th>ID</th><th>ソース</th><th>原題</th><th>訳題</th><th>作者</th>
     <th>年</th><th>館の年テキスト</th><th>style / category</th><th>作者数</th><th></th>
   </tr></thead>
   <tbody>
   {{range $res.Rows}}
     <tr>
+      {{if $d.Thumbs}}<td class="thumb">
+        {{if .ImageURL}}<img src="/img/{{.ID}}/400" alt="" loading="lazy"
+          data-image-id="{{.ID}}" data-width="400">{{end}}
+      </td>{{end}}
       <td class="num"><a href="/works/{{.ID}}">{{.ID}}</a></td>
       <td class="src">{{.Source}}</td>
       <td class="title">{{orElse "(無題)" (trunc 70 .Title)}}</td>

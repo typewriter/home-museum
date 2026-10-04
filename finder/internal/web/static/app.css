@@ -184,6 +184,18 @@ a.ext::after { content: " ↗"; font-size: 10px; color: var(--fg-muted); }
 
 .worktitle .orig { display: block; font-size: 13px; font-weight: 400; color: var(--fg-muted); margin-top: 2px; }
 
+/* 画像。詳細ページのみ大きく出す。一覧はサムネを明示的に有効にしたときだけ */
+.preview img {
+  max-width: min(100%, 800px); height: auto; display: block;
+  background: var(--bg-sunken); border: 1px solid var(--border); border-radius: 4px;
+}
+.preview .imgnote { font-size: 12px; margin: 6px 0 0; }
+table.grid td.thumb { padding: 2px 4px; }
+table.grid td.thumb img {
+  width: 64px; height: 64px; object-fit: contain;
+  background: var(--bg-sunken); border-radius: 3px; display: block;
+}
+
 section { margin-bottom: 24px; }
 .cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 0 24px; }
 

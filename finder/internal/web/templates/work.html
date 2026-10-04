@@ -12,6 +12,16 @@
   {{if $d.ImageURL}}<a class="ext" href="{{$d.ImageURL}}" target="_blank" rel="noopener">画像 URL</a>{{end}}
 </p>
 
+{{if and $.Images $d.ImageURL}}
+<section class="preview">
+  <img src="/img/{{$d.ID}}/1600" alt="{{orElse "(無題)" $d.Title}}"
+       data-image-id="{{$d.ID}}" data-width="1600" loading="lazy">
+  <p class="muted imgnote" data-for="{{$d.ID}}">
+    館の原本を取得してリサイズ・WebP 化したものです。未取得の場合は順番待ちの絵が出ます。
+  </p>
+</section>
+{{end}}
+
 <section>
   <h2>images <span class="muted">生の層 — loader.rb だけが書く</span></h2>
   {{template "table" $d.Image}}

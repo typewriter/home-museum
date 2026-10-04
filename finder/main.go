@@ -18,6 +18,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/typewriter/home-museum/finder/internal/imagecache"
 	"github.com/typewriter/home-museum/finder/internal/index"
 	"github.com/typewriter/home-museum/finder/internal/store"
 	"github.com/typewriter/home-museum/finder/internal/web"
@@ -31,6 +32,11 @@ func main() {
 	indexPath := fs.String("index", env("FINDER_INDEX", "./index.db"), "検索インデックスのパス")
 	addr := fs.String("addr", env("FINDER_ADDR", "127.0.0.1:8081"), "待ち受けアドレス")
 	timeout := fs.Duration("timeout", 30*time.Second, "1 クエリの上限時間")
+	imgStore := fs.String("images", env("FINDER_IMAGE_STORE", ""),
+		`画像の保管先。"r2" (要 R2_* 環境変数) / "local:<dir>" / 空で無効`)
+	cachePath := fs.String("cache", env("FINDER_CACHE", "./cache.db"), "画像キャッシュの状態 DB")
+	imgInterval := fs.Duration("image-interval", 10*time.Second, "館ごとの画像取得間隔")
+	imgQuality := fs.Int("image-quality", 80, "WebP の品質 (0-100)")
 	fs.Usage = func() {
 		fmt.Fprintf(os.Stderr, `finder — importer/hm.db を探索する内部ツール
 
@@ -70,10 +76,14 @@ func main() {
 		err = index.Build(ctx, *dbPath, *indexPath, os.Stderr)
 	case "serve":
 		err = serve(ctx, serveOptions{
-			DBPath:    *dbPath,
-			IndexPath: *indexPath,
-			Addr:      *addr,
-			Timeout:   *timeout,
+			DBPath:       *dbPath,
+			IndexPath:    *indexPath,
+			Addr:         *addr,
+			Timeout:      *timeout,
+			ImageStore:   *imgStore,
+			CachePath:    *cachePath,
+			ImageEvery:   *imgInterval,
+			ImageQuality: *imgQuality,
 		})
 	}
 	if err != nil && !errors.Is(err, http.ErrServerClosed) {
@@ -84,6 +94,9 @@ func main() {
 type serveOptions struct {
 	DBPath, IndexPath, Addr string
 	Timeout                 time.Duration
+	ImageStore, CachePath   string
+	ImageEvery              time.Duration
+	ImageQuality            int
 }
 
 func serve(ctx context.Context, o serveOptions) error {
@@ -96,8 +109,20 @@ func serve(ctx context.Context, o serveOptions) error {
 	log.Printf("hm.db  %s (読み取り専用)", st.DBPath)
 	log.Printf("index  %s", st.IndexPath)
 
+	cache, err := openCache(ctx, o)
+	if err != nil {
+		return err
+	}
+	if cache != nil {
+		defer cache.Close()
+		log.Printf("画像   %s", cache.Describe())
+		go cache.Run(ctx)
+	} else {
+		log.Printf("画像   無効 — -images r2 または -images local:<dir> で有効になります")
+	}
+
 	srv, err := web.New(st, web.Options{
-		QueryTimeout: o.Timeout,
+		QueryTimeout: o.Timeout, Cache: cache,
 	})
 	if err != nil {
 		return err
@@ -117,6 +142,24 @@ func serve(ctx context.Context, o serveOptions) error {
 
 	log.Printf("http://%s", o.Addr)
 	return hs.ListenAndServe()
+}
+
+// openCache は画像キャッシュを用意する。-images が空なら nil を返し、
+// finder は画像まわりの UI を一切出さない。
+func openCache(ctx context.Context, o serveOptions) (*imagecache.Cache, error) {
+	blob, err := imagecache.OpenBlob(o.ImageStore)
+	if err != nil {
+		return nil, err
+	}
+	if blob == nil {
+		return nil, nil
+	}
+	return imagecache.New(ctx, imagecache.Options{
+		DBPath:   o.CachePath,
+		Store:    blob,
+		Interval: o.ImageEvery,
+		Quality:  o.ImageQuality,
+	})
 }
 
 func env(key, def string) string {

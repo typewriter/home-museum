@@ -21,6 +21,10 @@ go run . serve          # http://127.0.0.1:8081
 | `-index` | `./index.db` | `FINDER_INDEX` |
 | `-addr` | `127.0.0.1:8081` | `FINDER_ADDR` |
 | `-timeout` | `30s` | — |
+| `-images` | 空 (無効)。`r2` / `local:<dir>` | `FINDER_IMAGE_STORE` |
+| `-cache` | `./cache.db` (画像キャッシュの状態) | `FINDER_CACHE` |
+| `-image-interval` | `10s` (館ごとの取得間隔) | — |
+| `-image-quality` | `80` (WebP の品質) | — |
 
 起動には索引 (`index.db`) が要る。先に `go run . index` を実行すること。
 
@@ -68,6 +72,56 @@ FTS5 の式を直接書きたいときは「FTS5 の式をそのまま渡す」�
 | `/artists/detail?key=` | 寄せられた生表記の内訳 (`name_raw` × 判定手法 × 件数) とソース別作品数 |
 | `/artists/unmatched` | `person_key IS NULL` の作者表記を件数の多い順に。名寄せの取りこぼしを潰す用 |
 | `/stats` | 派生層のカバレッジ (ソース × テーブル)、`date_precision` / `role_bucket` / 世紀別の分布、索引の状態。10 分キャッシュ (`?refresh=1` で再集計) |
+
+## 画像キャッシュ
+
+`-images` を指定したときだけ有効。設計の根拠は [`spec_image_cache.md`](spec_image_cache.md)。
+
+```bash
+sudo apt install libvips-tools webp        # 変換に libvips が要る
+
+go run . serve -images local:./imagecache  # 動作確認用 (ローカルに置く)
+
+# 本番は Cloudflare R2
+export R2_ACCOUNT_ID=... R2_BUCKET=... R2_ACCESS_KEY_ID=... R2_SECRET_ACCESS_KEY=...
+go run . serve -images r2
+```
+
+**館へは館ごとに 10 秒に 1 回しか取りに行かない (AIC だけ 30 秒に 1 回、§3)。**
+取得したものはリサイズして WebP にし (1600px と 400px)、無期限で保管する。
+
+- 保管キーは `sha256(source_url)`。`images.id` を使うと hm.db の再構築で
+  全キャッシュが迷子になる (§1)
+- 404 / 410 / 画像でないものは `gone` として記録し、**二度と館に取りに行かない** (§2)
+- IIIF の館 (aic / rijksmuseum、全体の 55%) には原寸ではなく 1600px を要求する。
+  館の転送量が 58% 減る (§4)
+- AIC はブラウザ相当の User-Agent と `Referer` の両方が無いと 403 を返す (§4)
+- 変換は `vipsthumbnail`。Go に実用的な lossy WebP エンコーダが純 Go で無いため
+  外部コマンドにしている。おかげで finder 本体は cgo なしのまま (§5)
+
+未取得の画像を要求されても**ブラウザは待たせない**。202 とプレースホルダを即返し、
+ページ側の JS が状態を見て差し替える。待ち枚数と所要時間の目安が出る。
+
+**一覧のサムネイルは既定で出さない。**1 ページ 50 件を一度に要求すると、館ごと
+10 秒では埋まるのに数分かかるため。必要なときだけ「サムネイルを出す」を有効にする。
+
+進捗は `/stats` の「画像キャッシュ」節で見られる。
+
+### 実測値
+
+原寸取得 → 1600px + 400px の WebP 生成 (ICC の sRGB 変換込み):
+
+| source | 元 | 1600px | 400px | 時間 |
+|---|---:|---:|---:|---:|
+| rijksmuseum | 1.25 MB | 0.90 MB | 0.065 MB | 1.5s |
+| aic | 2.00 MB | 0.85 MB | 0.036 MB | 1.4s |
+| cleveland | 1.16 MB | 0.10 MB | 0.008 MB | 0.6s |
+| met | 0.54 MB | 0.04 MB | 0.004 MB | 0.4s |
+| parismusees | 6.44 MB | 0.69 MB | 0.025 MB | 1.2s |
+| smithsonian | 8.70 MB | 0.28 MB | 0.015 MB | 0.7s |
+
+全 1,361,997 件ぶんで約 0.65 TB。ただし館ごと 10 秒では Rijksmuseum だけで
+80 日かかるので、実際にはずっと緩やかに増える。
 
 ## 既知の制約
 

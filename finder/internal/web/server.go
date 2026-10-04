@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/typewriter/home-museum/finder/internal/imagecache"
 	"github.com/typewriter/home-museum/finder/internal/store"
 )
 
@@ -31,6 +32,7 @@ var pages = []string{
 // Server は 1 プロセスぶんの状態。
 type Server struct {
 	st        *store.Store
+	cache     *imagecache.Cache // nil なら画像表示を出さない
 	tpl       map[string]*template.Template
 	queryWait time.Duration
 
@@ -51,6 +53,8 @@ type Server struct {
 type Options struct {
 	// QueryTimeout は 1 リクエストあたりの上限。
 	QueryTimeout time.Duration
+	// Cache が nil のときは画像まわりの UI を一切出さない。
+	Cache *imagecache.Cache
 }
 
 func New(st *store.Store, opt Options) (*Server, error) {
@@ -59,6 +63,7 @@ func New(st *store.Store, opt Options) (*Server, error) {
 	}
 	s := &Server{
 		st:        st,
+		cache:     opt.Cache,
 		tpl:       map[string]*template.Template{},
 		queryWait: opt.QueryTimeout,
 		statusTTL: 60 * time.Second,
@@ -87,6 +92,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /artists/unmatched", s.handleUnmatched)
 	mux.HandleFunc("GET /artists/detail", s.handleArtist)
 	mux.HandleFunc("GET /stats", s.handleStats)
+	mux.HandleFunc("GET /img/{id}/{w}", s.handleImage)
+	mux.HandleFunc("GET /img/{id}/{w}/status", s.handleImageStatus)
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("ok\n"))
 	})
@@ -105,10 +112,11 @@ func logRequests(next http.Handler) http.Handler {
 
 // pageData は layout が使う共通部分。各ページ固有の値は Data に入れる。
 type pageData struct {
-	Title string
-	Nav   string
-	Index store.IndexStatus
-	Data  any
+	Title  string
+	Nav    string
+	Index  store.IndexStatus
+	Images bool // 画像キャッシュが有効か
+	Data   any
 }
 
 func (s *Server) render(w http.ResponseWriter, r *http.Request, page, title, nav string, data any) {
@@ -118,10 +126,11 @@ func (s *Server) render(w http.ResponseWriter, r *http.Request, page, title, nav
 		return
 	}
 	pd := pageData{
-		Title: title,
-		Nav:   nav,
-		Index: s.indexStatus(r.Context()),
-		Data:  data,
+		Title:  title,
+		Nav:    nav,
+		Index:  s.indexStatus(r.Context()),
+		Images: s.cache != nil,
+		Data:   data,
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := t.Execute(w, pd); err != nil {

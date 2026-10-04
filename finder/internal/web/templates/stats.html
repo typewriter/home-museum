@@ -67,6 +67,42 @@
   {{template "table" $s.Centuries}}
 </section>
 
+{{with $d.Cache}}
+<section>
+  <h2>画像キャッシュ <span class="muted">{{$d.CacheDesc}}</span></h2>
+  <div class="tablewrap">
+  <table class="grid">
+    <thead><tr><th>source</th><th class="num">取得待ち</th><th class="num">取得済み</th>
+      <th class="num">再試行待ち</th><th class="num">取得不能</th><th class="num">容量</th>
+      <th>待ち時間の目安</th></tr></thead>
+    <tbody>
+      {{range .BySource}}
+      <tr>
+        <td class="src">{{.Source}}</td>
+        <td class="num">{{comma .Queued}}</td>
+        <td class="num">{{comma .Ready}}</td>
+        <td class="num">{{comma .Failed}}</td>
+        <td class="num">{{comma .Gone}}</td>
+        <td class="num">{{mib .Bytes}}</td>
+        <td class="muted">{{.ETAText}}</td>
+      </tr>
+      {{end}}
+      <tr class="total">
+        <td>合計</td>
+        <td class="num">{{comma (index .ByState "queued")}}</td>
+        <td class="num">{{comma (index .ByState "ready")}}</td>
+        <td class="num">{{comma (index .ByState "failed")}}</td>
+        <td class="num">{{comma (index .ByState "gone")}}</td>
+        <td class="num">{{mib .Bytes}}</td>
+        <td class="muted">館ごと {{.Interval}} に 1 回</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="muted">取得不能 (gone) は 404 / 410 / 画像でないもの、および 8 回失敗したもの。二度と館に取りに行きません。</p>
+</section>
+{{end}}
+
 <section>
   <h2>索引 (index.db)</h2>
   <table class="grid kv">
