@@ -35,9 +35,9 @@ Ruby 4.0.6 (`.ruby-version`)。`hm.db` の場所は環境変数 `DATABASE_PATH` 
 | `ruby crawlers/rijksmuseum.rb` | `crawlers/rijksmuseum.lmdb` | 838,386 | `crawlers/rijksmuseum.resume` に resumptionToken | OAI-PMH / RDF-XML |
 | `ruby crawlers/smithsonian.rb` | `crawlers/smithsonian.lmdb` | 96,529 | `crawlers/smithsonian.resume` に完了シャード URL | S3 のバルクメタデータ。API キー不要 |
 | `ruby crawlers/cleveland.rb` | `crawlers/cleveland.lmdb` | 66,833 | `crawlers/cleveland.resume` | 5〜10秒/ページ |
-| `ruby crawlers/wikimedia.rb` | `crawlers/wikimedia.lmdb` | 358,290 (+ 作者 26,697) | **なし**(毎回先頭から。書き込みの重複だけ `KVStore#has?` で避ける) | 他と違い館のREST APIではなく、Wikidataの truthy ダンプ(N-Triples, 圧縮40GB超)を`curl \| bzcat`でストリーム処理する。ディスクには保存しない。painting/drawing/print/mosaic/frescoでpublic domainかつ画像ありのものだけ抽出。**1回のフル実行はネットワーク・CPU次第で数時間〜半日以上かかる見込み** |
+| `ruby crawlers/wikimedia.rb` | `crawlers/wikimedia.lmdb` | 358,290 (+ 作者 26,697) | **なし**(毎回先頭から。書き込み済みの QID は飛ばす) | Wikidata のダンプ (圧縮 40GB 超) をストリーム処理。**数時間〜半日以上** |
 
-Wikimediaだけは作者(creator)の生没年をダンプ単体では取れない(参照QIDのみ)ため、抽出後に別途 `ruby crawlers/wikimedia.rb enrich` を実行する。これが唯一のライブHTTPで、Wikidata API (`wbgetentities`)を50件バッチ・1秒間隔で叩き、429を受けたら`Retry-After`ヘッダーに従って待つ。結果は同じLMDBに`author:Q...`キーで格納される。
+Wikimedia は抽出後に `ruby crawlers/wikimedia.rb enrich` で作者の名前・生没年を補う (Wikidata API を 50 件ずつ 30 秒間隔。中断しても再実行で続きから)。
 
 LMDB の mapsize (`KVStore::MAP_SIZE`) は 64GB。**仮想アドレス空間の予約であって実ディスク消費ではない**ので、大きくても害はない。使い切ると `LMDB::Error::MAP_FULL` でクローラーが落ちるが、既に書けている分は無事なので定数を上げて再開すればよい。一時的に上げたいだけなら環境変数 `LMDB_MAP_SIZE` (バイト数) で上書きできる。
 
@@ -54,8 +54,6 @@ ruby loader.rb aic=/path/to.lmdb  # LMDB のパスを明示
 `images` と `image_artists` の**生の列だけ**を書く。既存行は upsert され、値が変わった行だけ `updated_at` が更新される。何度実行しても安全。
 
 所要時間は Cleveland 40,442件 で 8 秒、AIC 58,828件 で 15 秒。ただし **Rijksmuseum だけは 1 件ごとに RDF/XML をパースするため 30 分超**かかる。
-
-> ここに「解釈」を書いてはいけない。館のデータをそのまま写す以上のこと(精度の分類・役割のバケット分け・名寄せ)は下の派生スクリプトの仕事。この線引きが崩れると、ルールを直すたびに LMDB 全走査が必要になる。
 
 ### 3. 正規化・翻訳の適用 — `hm.db` → `hm.db`
 
@@ -95,7 +93,7 @@ ruby with_llms/title_translation_batch.rb cleveland append F # 翻訳結果 JSON
 
 実際に翻訳を回すには、サブエージェントに次のプロンプトを渡す。
 
-- [`with_llms/title_translation_prompt.md`](with_llms/title_translation_prompt.md) — サブエージェントに投げる場合のプロンプト
+- [`with_llms/title_translation_prompt.md`](with_llms/title_translation_prompt.md)
 
 作者名の CSV (`artist_names_ja_<source>.csv`) を作るツールはまだ無い。適用側 (`apply_translations.rb artists`) は先に用意してある。
 
@@ -107,8 +105,6 @@ ruby with_llms/title_translation_batch.rb cleveland append F # 翻訳結果 JSON
 | `kv_store.rb` | LMDB の薄いラッパー (`KVStore`) |
 | `db.rb` | `hm.db` への接続と `schema.sql` の冪等適用 |
 | `schema.sql` | DDL。テーブル定義はここ 1 箇所 |
-
-`loader.rb` と `with_llms/title_translation_batch.rb` は「どのレコードを対象とするか」と `source_url` の作り方が一致していないと翻訳 CSV が JOIN できなくなるため、抽出は `loaders.rb` にだけ実装する。
 
 ## 典型的な作業手順
 
@@ -143,19 +139,9 @@ ruby apply_translations.rb titles cleveland
 ruby apply_translations.rb stale
 ```
 
-## `hm.db` のテーブル
+## `hm.db` の引き方
 
-| テーブル | 書き手 | 内容 |
-|---|---|---|
-| `images` | `loader.rb` | 作品。`source_url` が一意キー |
-| `image_artists` | `loader.rb` | 作品ごとの作者エントリ (1作品 n作者) |
-| `image_dates` | `normalize_dates.rb` | 正規化した制作年 |
-| `image_translations` | `apply_translations.rb` | 作品単位のテキスト翻訳 (いまはタイトルのみ) |
-| `image_artist_names` | `apply_translations.rb` | 作者エントリ単位の名前訳 |
-
-`image_artists.role_bucket` だけは `normalize_artists.rb` が後から埋める派生列。
-
-表示側はこの形で引く。
+テーブルと書き手の対応は [`spec_schema.md`](docs/spec_schema.md)。表示側はこの形で引く。
 
 ```sql
 select coalesce(t.text, i.title) as title,
@@ -184,5 +170,3 @@ select coalesce(t.text, i.title) as title,
 - `*.lmdb/` と `*.db` はリポジトリに含めない (`.gitignore` 済み)。LLM の成果物 (`with_llms/titles_ja_*.csv`、`author_merges.csv`) も作り直せない正本だが、ローカルに置いて追跡しない。消さないこと
 - `sqlite3` gem は 2.x。`execute` へのバインド変数は可変長引数ではなく**配列**で渡す
 - SQLite では二重引用符は文字列ではなく**識別子**を意味する。`where method = "source"` は `images.source` 列との比較になってしまうので、文字列リテラルには単一引用符を使う
-- 作者名の日本語訳は名寄せ (`person_key`) ではなく作者エントリ単位にぶら下げてある。名寄せのルールを直して `person_key` が変わっても訳は失われない
-- `crawlers/*.rb` はいずれも `require_relative '../kv_store'` で `importer/kv_store.rb` を見る (クローラーを `crawlers/` へ移した際に相対パスの更新が漏れていたバグを wikimedia.rb 追加時に修正した)

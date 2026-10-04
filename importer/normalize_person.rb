@@ -398,7 +398,6 @@ def merge_people(people, placeholder_pairs)
 end
 
 # 段階7: author_merges.csv の判定を段階1〜6 の結果に重ねる。
-# CSV は person_key を参照しているので、いま算出したキーから pid を逆引きする。
 def apply_llm_merges(people, uf, keys, matches)
   by_key = Hash.new { |h, k| h[k] = [] }
   keys.each { |pid, key| by_key[key] << pid }
@@ -414,9 +413,7 @@ def apply_llm_merges(people, uf, keys, matches)
     detail = details[from]
     pids.each { |pid|
       uf.union(pid, target)
-      # 「なぜこの人物がこのクラスタに入ったか」を上書きするのは、段階1〜6 では
-      # 統合されていなかった (単独だった) 場合だけにする。機械ルールで既に
-      # まとまっていた分の理由は残す。
+      # 機械ルールで既にまとまっていた人物の理由は上書きしない。
       current = matches[pid]
       next if current && !%w[source_id none].include?(current.method)
 
@@ -556,8 +553,6 @@ uf, matches = merge_people(people, placeholder_pairs)
 keys = person_keys(people, uf)
 STDERR.puts "  段階1〜6: #{keys.values.uniq.size}人 (統合前 #{people.size}人物)"
 
-# 段階7: LLM の判定 (author_merges.csv)。段階1〜6 の結果に対する追加の統合として
-# 適用する。CSV が正本なので、このスクリプトを何度回しても判定は失われない。
 applied, skipped = apply_llm_merges(people, uf, keys, matches)
 if applied > 0 || skipped > 0
   keys = person_keys(people, uf)

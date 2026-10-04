@@ -1,32 +1,25 @@
 # LLM による名寄せ判定 (段階7) の保管と適用。
 #
-# 判定の正本は CSV (author_merges.csv) に置く。hm.db 側は派生層なので
-# normalize_person.rb を回し直せば作り直せるが、LLM の判定は作り直せないため。
-# titles_ja_<source>.csv と apply_translations.rb の関係と同じ構図。
+# LLM の判定は作り直せないので、正本は hm.db ではなく CSV (author_merges.csv) に置く。
 #
 #   with_llms/author_merge_batch.rb append  → CSV に追記し、DB へ差分適用 (速い)
 #   normalize_person.rb           → 段階1〜6 の後に CSV を読んで同じ結果を再現
 #
-# person_key を参照しているので、キーが安定していることが前提になる。典拠ID由来の
-# キー (ulan: 等) は外部で安定、cluster: 由来はクラスタの代表メンバーから決定的に
-# 導いているので、同じルールで再実行すれば変わらない。ルールを変えて cluster: の
-# キーが動いた行は解決できなくなるため、その場合は警告して読み飛ばす。
+# CSV は person_key を参照する。ルールを変えて cluster: のキーが動いた行は
+# 解決できなくなるので、警告して読み飛ばす。
 
 require "csv"
 require "set"
 require_relative "author_names"
 
 module AuthorMerges
-  # 既定はリポジトリ直下。テストで別の場所を使いたいときだけ環境変数で差し替える。
   PATH = ENV["AUTHOR_MERGES_PATH"] ||
          File.join(File.dirname(File.expand_path(__FILE__)), "author_merges.csv")
   HEADERS = %w[person_key merge_into confidence reason display_name decided_at].freeze
 
   module_function
 
-  # 読み込みは1プロセス内で1回に留める。呼ぶたびにパースすると、うっかり
-  # ループの中で呼んだときに桁違いに遅くなる (実際に append が6分かかった)。
-  # 追記したら reset! を呼ぶこと。
+  # ループ内で呼んでも再パースしないようにキャッシュする。追記したら reset! を呼ぶこと。
   def rows
     @rows ||= File.exist?(PATH) ? CSV.read(PATH, headers: true).map(&:to_h) : []
   end

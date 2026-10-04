@@ -8,12 +8,7 @@
 #   ruby author_merge_batch.rb next 30       未判定を30件取り出し .author_merge_batch.json へ
 #   ruby author_merge_batch.rb append F      判定結果JSON を CSV に追記し DB へ適用
 #
-# 判定の正本は author_merges.csv。DB 側は派生層なので normalize_person.rb を
-# 回し直せば作り直せるが、LLM の判定は作り直せないため CSV に残す。
-#
-# 取り出す順序は作品点数の降順に固定してある。未統合の作者は45,000人ほどいて
-# 全件は到底さばけないが、点数は極端に偏っている (上位は数千点、大半は1点) ので、
-# 点数順に処理すれば少ない判定回数で効果が出る。
+# 取り出す順序は作品点数の降順 (理由は docs/spec_normalization.md)。
 
 require "json"
 require "set"
@@ -306,7 +301,7 @@ when "append"
   puts "applied=#{applied} person_key を書き換え"
 
   # decided は上で組み立てた集合を使い回す。ここで AuthorMerges.decided_keys を
-  # 呼ぶと 4万件のループごとに CSV を読み直すことになる (append が6分かかった原因)。
+  # 呼ぶと 4万件のループごとに CSV を読み直すことになる。
   puts "remaining=#{all.count { |r| !r.merged && !decided.include?(r.key) }}"
 
 else

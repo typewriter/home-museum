@@ -6,11 +6,8 @@
 #   ruby title_translation_batch.rb SOURCE scan         対象一覧キャッシュを作り直す
 #   ruby title_translation_batch.rb sources             扱えるSOURCE名を一覧表示
 #
-# SOURCE は loaders.rb の Loaders::SOURCES のキー (aic/met/parismusees/
-# rijksmuseum/smithsonian/cleveland)。入力 LMDB・出力 CSV・作業ファイルは
-# すべてこの名前から導出される:
-#
-#   <SOURCE>.lmdb → titles_ja_<SOURCE>.csv
+# SOURCE は Loaders::SOURCES のキー。入力 LMDB も出力 CSV (titles_ja_<SOURCE>.csv) も
+# これで決まる。
 #
 # 翻訳結果JSONの形式:
 #   [{"source_url": "...", "title_ja": "...", "confidence": "high|medium|low"}, ...]
@@ -42,12 +39,8 @@ class TitleTranslationBatch
     @count_path = "#{BASE_DIR}/.title_translation_targets_#{name}.count"
   end
 
-  # LMDB を1回だけ走査して対象レコードを JSONL に落とす。
-  #
-  # Rijksmuseum は1件ごとに RDF/XML をパースするため全走査に数十分かかり、
-  # next/append のたびに走査し直すのは現実的でない。LMDB のキー順は安定して
-  # いるので、キャッシュの行順 = バッチの区切りも実行ごとにぶれない。
-  # クローラーを再実行して母数が増えたら scan で作り直す。
+  # 対象レコードを JSONL にキャッシュする。Rijksmuseum は全走査に数十分かかるので、
+  # next/append のたびには走査しない。クローラーを再実行して母数が増えたら作り直す。
   def scan
     # 件数は走査「前」に採る。走査中にクローラーが書き足した分は次回 warn_if_stale
     # で検出させたいので、多め (走査後の値) に記録してはいけない。
@@ -63,9 +56,7 @@ class TitleTranslationBatch
         next if !url || seen[url]
         seen[url] = true
 
-        # 原題を持たないレコードは翻訳しようがない (Wikimedia は Wikidata の
-        # ラベルが全言語で欠けている作品が6%ほどある)。ここで落とさないと
-        # next が毎回それを先頭から返し、翻訳不能な行が溜まって進まなくなる。
+        # 原題の無いレコードは除く (docs/spec_normalization.md)
         next if record[:title].to_s.strip.empty?
 
         f.puts JSON.generate(FIELDS.to_h { |k| [k, record[k]] })
@@ -105,12 +96,9 @@ class TitleTranslationBatch
     store&.close
   end
 
-  # next/append はこの後に status も呼ぶので、1 プロセス内では一度だけ読む。
-  #
-  # CSV.read で全列をパースすると 12 万行で 7 秒かかり、バッチ1回ごとに
-  # 2度払うことになる。欲しいのは source_url だけで、それは常に
-  # 「ラベル,URL,」の形で行頭に来るので行単位の正規表現で拾う。原題に
-  # 改行を含む行の継続行はラベルで始まらないので拾われない。
+  # CSV.read で全列をパースすると 12 万行で 7 秒かかる。要るのは行頭の
+  # 「ラベル,URL,」だけなので正規表現で拾う (原題の改行による継続行はラベルで
+  # 始まらないので拾われない)。next/append は後で status も呼ぶので一度だけ読む。
   def translated_urls
     @translated_urls ||= begin
       prefix = /\A#{Regexp.escape(CSV.generate_line([@label], row_sep: ''))},([^,"\r\n]+),/

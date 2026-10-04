@@ -12,10 +12,8 @@
 #   titles_ja_<source>.csv       source,source_url,title_original,title_ja,confidence,translated_at
 #   artist_names_ja_<source>.csv source,name_raw,name_ja,confidence,translated_at
 #
-# タイトルは作品ごと (source_url がキー) だが、作者名は生表記ごとに1行しか持たない。
-# 同じ表記の image_artists 行すべてに同じ訳を展開する。「同じ文字列には同じ訳を当てる」
-# だけで「同じ文字列は同じ人物」とは主張していないので、同姓同名の別人が統合される
-# ことはない (DB 側のキーはあくまで image_artist_id)。
+# 作者名の CSV は生表記ごとに1行で、同じ表記の image_artists 行すべてに展開する
+# (spec_schema.md §3)。
 
 require_relative "db"
 require_relative "loaders"
