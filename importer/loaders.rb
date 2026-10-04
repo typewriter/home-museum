@@ -360,26 +360,20 @@ module Loaders
     }
   end
 
-  # 対象クラスのQID→ラベル、BCE対応の年パースはどちらも crawlers/wikimedia.rb が
-  # 唯一の定義を持つ (二重管理を避けるため)。ここでは読み込んで再利用するだけ。
   require_relative "crawlers/wikimedia"
 
-  # BCEの年 (負数) を含みうる [start, end] を表示用文字列にする。
-  # 単純に "-" で連結すると -100/-50 が "-100--50" のような曖昧な二重ハイフンに
-  # なるため、マイナス記号と衝突しない区切り記号を使う。
+  # BCE は負数なので、"-" で繋ぐと "-100--50" になる。区切りは en dash にする。
   def wikimedia_date_range(date_start, date_end)
     return date_start.to_s if date_start && date_end.nil?
     return date_end.to_s if date_end && date_start.nil?
     return nil if date_start.nil?
     return date_start.to_s if date_start == date_end
 
-    "#{date_start}–#{date_end}" # en dash
+    "#{date_start}–#{date_end}"
   end
 
   def wikimedia(path)
-    # "author:Q..." (crawlers/wikimedia.rb enrich が書いた作者情報) と作品本体を
-    # 1回の store.each で振り分けて集める。別々に2回スキャンすると LMDB を
-    # 二度読むことになり、件数が伸びたときに無視できないI/Oになる。
+    # 作者 (author:Q...) と作品が同じ LMDB にあるので、1 回の走査で振り分ける。
     authors = {}
     artworks = []
     store = KVStore.new(path)

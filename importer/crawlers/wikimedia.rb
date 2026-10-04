@@ -1,22 +1,14 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
-# Wikidata の truthy ダンプ (N-Triples, 数十GB) を丸ごとストリーム処理し、
-# 対象の作品種別 (painting/drawing/print/mosaic/fresco) のうち
-# 著作権状態がパブリックドメインで画像を持つエンティティだけを LMDB に落とす。
-#
-# 他のクローラーと違い、単一の館ダンプAPIをページングするのではなく
-# dumps.wikimedia.org が配布する全世界共通の1ファイルをフィルタする形になる
-# (AIC/METのようなREST APIも、カテゴリ巡回もしない。理由は README 参照)。
+# Wikidata の truthy ダンプ (N-Triples) から、対象の作品種別のうち
+# パブリックドメインで画像を持つものだけを LMDB に落とす。
 #
 #   ruby wikimedia.rb          対象作品を crawlers/wikimedia.lmdb へ抽出
-#   ruby wikimedia.rb enrich   抽出済みレコードが参照する作者(creator)の
-#                              名前・生没年を Wikidata API から補う (唯一のライブHTTP)
+#   ruby wikimedia.rb enrich   作者の名前・生没年を Wikidata API から補う
 #
-# ダンプは curl | bzcat のパイプでストリームするだけで、ディスクには保存しない
-# (40GB超の圧縮ファイルを保存する余裕が無い環境でも動く)。
-# 中断からの再開は無い (AIC と同じ割り切り。再実行すると最初からになるが、
-# 既に書いた QID は KVStore#has? で検出してスキップするため書き込みの重複は起きない)。
+# ダンプは圧縮で 40GB を超えるので、保存せずに curl | bzcat で流す。
+# 再開の仕組みは無く、再実行すると先頭から読み直す (書き込み済みの QID は飛ばす)。
 
 require 'json'
 require 'time'
@@ -32,10 +24,7 @@ module Wikimedia
   PROP_PREFIX = 'http://www.wikidata.org/prop/direct/'
   LABEL_PRED = 'http://www.w3.org/2000/01/rdf-schema#label'
 
-  # instance of (P31) がこのいずれかであれば取り込む。QID → 英語ラベルの
-  # 対応表を兼ねており、loaders.rb はカテゴリ表示にこの定数をそのまま再利用する
-  # (QIDリストの二重管理を避けるため、対象クラスの定義はここ1箇所だけに置く)。
-  # 拡張するときはここに追記するだけでよい (spec は importer/README.md)。
+  # instance of (P31) がこのいずれかなら取り込む。loaders.rb もカテゴリ名に使う。
   TARGET_CLASSES = {
     'Q3305213'  => 'painting',
     'Q93184'    => 'drawing',
@@ -47,7 +36,6 @@ module Wikimedia
 
   PUBLIC_DOMAIN = 'Q19652' # copyright status (P6216) の値
 
-  # このプロパティだけ値を溜める。他は読み飛ばして解析コストを削る。
   WANTED_PROPS = %w[P31 P6216 P18 P170 P571 P572 P1476].to_set.freeze
 
   USER_AGENT = 'HomeMuseumImporter/1.0 (https://github.com/typewriter/home-museum; ' \
@@ -57,11 +45,8 @@ module Wikimedia
 
   module_function
 
-  # ===================== NTriples の最小パーサ =====================
-  #
-  # truthy ダンプは1行1トリプル (<s> <p> o .) で、値は必ず \uXXXX / \UXXXXXXXX
-  # でエスケープされている (実測: 生UTF-8ではない)。フルのNTriples文法は
-  # 実装せず、このダンプで実際に出てくる形だけを扱う。
+  # N-Triples の文法すべては実装せず、このダンプに出てくる形だけを扱う
+  # (1行1トリプルで、非 ASCII は必ず \uXXXX / \UXXXXXXXX でエスケープされている)。
 
   # "..."(@lang | ^^<...>)? → [値, 言語 or nil]。リテラルでなければ nil。
   def parse_literal(object_str)
@@ -143,18 +128,14 @@ module Wikimedia
     [subject, predicate, object_str]
   end
 
-  # ===================== エンティティ組み立て =====================
-
   # subject は生URI (例: "http://www.wikidata.org/entity/Q42")、qid はその短縮形。
-  # 行ごとの主語判定は subject 同士 (どちらも生URI) で比較しないと常に不一致になる。
   Entity = Struct.new(:subject, :qid, :props, :label_en, :label_ja) do
     def initialize
       super(nil, nil, Hash.new { |h, k| h[k] = [] }, nil, nil)
     end
   end
 
-  # 溜めた1エンティティぶんの props から、対象条件を満たせばレコードを返す。
-  # 満たさなければ nil (呼び出し側は無視するだけでよい)。
+  # 対象条件を満たさなければ nil。
   def build_record(qid, props, label_en, label_ja)
     instance_of = props['P31'].filter_map { |o| qid_of(o) }
     return nil if (instance_of.to_set & TARGET_CLASS_QIDS).empty?
@@ -188,13 +169,7 @@ module Wikimedia
     }
   end
 
-  # ===================== フェーズ1: ダンプの抽出 =====================
-
-  # lines (改行ごとに読み出せる何か。IO でも配列でもよい) を1エンティティずつ
-  # 組み立て、対象条件を満たすものだけ [qid, record] として yield する。
-  # curl|bzcat を経由しない配列を渡せるので、パース/組み立てロジックだけを
-  # 単体テストできる (import 本体から切り出した理由はこれ)。
-  # 戻り値は走査した実体数 (対象クラス外も含む)。
+  # 対象条件を満たすものだけ [qid, record] で yield する。戻り値は走査したエンティティ数。
   def each_matched_record(lines, progress_every: 200_000)
     entity = Entity.new
     seen = 0
@@ -218,9 +193,6 @@ module Wikimedia
       next unless triple
       subject, predicate, object_str = triple
 
-      # subject (生URI) 同士で比較する。qid (短縮形) と比較すると型が
-      # 揃わず常に不一致になり、1行ごとに flush されて props が絶対に
-      # 蓄積されないバグになる (このヘルパを切り出す前に実際に踏んだ)。
       if subject != entity.subject
         flush.call
         entity = Entity.new
@@ -249,13 +221,11 @@ module Wikimedia
     matched = 0
     seen = 0
 
-    # set -o pipefail が無いと、bash のパイプはパイプ内で「最後に実行された
-    # コマンド (bzcat)」の終了コードしか見ない。curl がダンプ取得の途中で
-    # 失敗しても bzcat が (空/不完全な入力を) 0 で終えれば $?.success? が
-    # true になり、実際には何も取れていないのに「完了」と表示してしまう。
+    # pipefail が無いと終了コードは bzcat のものだけになり、curl が途中で
+    # 失敗しても成功扱いになる。
     IO.popen(['bash', '-c', "set -o pipefail; curl -sS --fail '#{DUMP_URL}' | bzcat"]) { |io|
       seen = each_matched_record(io) { |qid, record|
-        next if db.has?(qid) # 再実行時の重複書き込みを避ける (resumeの代わり)
+        next if db.has?(qid)
         db[qid] = JSON.generate(record)
         matched += 1
       }
@@ -267,20 +237,14 @@ module Wikimedia
     db&.close
   end
 
-  # ===================== フェーズ2: 作者情報の補完 (ライブAPI) =====================
-  #
-  # ダンプ単体では P170 (creator) は参照先QIDしか分からない (生没年は別エンティティ)。
-  # 抽出が終わったレコードが参照する creator QID の集合だけ、Wikidata API を
-  # バッチ (最大50件/リクエスト) で叩いて名前・生没年を補う。
-  # 429 (Too Many Requests) は Retry-After ヘッダーに従って待つ。
+  # 作品から見た作者 (P170) は QID だけなので、名前・生没年は API で補う。
 
   WBGETENTITIES_URL = 'https://www.wikidata.org/w/api.php'
   BATCH_SIZE = 50
   REQUEST_INTERVAL_SEC = 30.0
 
-  # Retry-After (秒数 or HTTP-date、RFC 9110 §10.2.3) を待機秒数にする。
-  # "Wed, 21 Oct 2026 07:28:00 GMT" のような日付形式は String#to_i だと
-  # 数字始まりでないため黙って 0 になり、レート制限中に即リトライしてしまう。
+  # Retry-After は秒数のほか HTTP-date でも来る。日付形式を to_i すると 0 になり、
+  # レート制限中に即リトライしてしまう。
   def parse_retry_after(value)
     return 60 if value.nil? || value.strip.empty?
     return value.to_i if value.strip.match?(/\A\d+\z/)
@@ -322,9 +286,7 @@ module Wikimedia
     m && m[1].to_i
   end
 
-  # LMDBへの書き込みはバッチ内の1件ずつ即コミットされ、次回起動時は
-  # todo の算出で "author:#{qid}" 済みを弾くため、Ctrl+C で中断しても
-  # 再度 `enrich` を叩くだけで取りこぼしなく再開できる。
+  # 取得済みの作者は飛ばすので、中断しても再実行すれば続きから取れる。
   def enrich
     db = KVStore.new(LMDB_PATH)
 
