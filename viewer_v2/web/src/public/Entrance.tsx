@@ -3,7 +3,7 @@ import { Artwork } from "../shared/Artwork";
 import { Link, path } from "../shared/router";
 import { useTitle } from "../shared/title";
 import { useFetch } from "../shared/useFetch";
-import { Header, SectionHeading } from "./Header";
+import { Footer, Header, SectionHeading } from "./Header";
 import { NotFoundPage } from "./NotFoundPage";
 
 export const prefix = (kind: Kind) => (kind === "collection" ? "c" : "a");
@@ -36,8 +36,9 @@ export function Entrance({ kind, exKey, page }: Props) {
   return (
     <>
       <Header />
-      <main className="container page">
-        <section className="entrance">
+      <main>
+        <section className="band entrance-band">
+        <div className="container entrance">
           <div className="entrance-image">
             {ex.cover_id != null && (
               <Artwork key={ex.cover_id} id={ex.cover_id} width={1600} alt="" className="entrance-cover" eager />
@@ -55,9 +56,10 @@ export function Entrance({ kind, exKey, page }: Props) {
               </Link>
             )}
           </div>
+        </div>
         </section>
 
-        <section className="section">
+        <section className="container section page">
           <SectionHeading en="Catalogue">出品作品</SectionHeading>
           <ol className="catalog" start={(page - 1) * per + 1}>
             {works.map((w, i) => {
@@ -87,6 +89,7 @@ export function Entrance({ kind, exKey, page }: Props) {
           )}
         </section>
       </main>
+      <Footer />
     </>
   );
 }
