@@ -89,7 +89,6 @@
           <option value="200" {{if eq $p.Per 200}}selected{{end}}>200</option>
         </select>
       </label>
-      <label class="chk"><input type="checkbox" name="like" value="1" {{if $p.Like}}checked{{end}}> LIKE で引く (索引を使わない)</label>
       <label class="chk"><input type="checkbox" name="raw" value="1" {{if $p.Raw}}checked{{end}}> FTS5 の式をそのまま渡す</label>
     </div>
   </details>
@@ -147,7 +146,7 @@
   {{if $res.HasNext}}<a href="{{urlWith $d.Query "page" (printf "%d" (add $res.Page 1))}}">次 →</a>{{end}}
 </nav>
 {{else}}
-<p class="muted">該当なし。索引が古い可能性がある場合は「LIKE で引く」を試してください。</p>
+<p class="muted">該当なし。</p>
 {{end}}
 
 <details class="sqlpanel">

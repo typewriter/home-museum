@@ -17,9 +17,6 @@ const CountCap = 10000
 type SearchParams struct {
 	Q   string
 	Raw bool // Q を FTS5 の式としてそのまま渡す
-	// Like は FTS を使わず LIKE で引く。索引に載っていない断片や、
-	// 索引を作り直す前の確認に使う。
-	Like bool
 
 	Sources   []string
 	Style     string // facet の完全一致
@@ -175,8 +172,7 @@ func parseQuery(q string) parsedQuery {
 	return p
 }
 
-// SearchWorks は作品を検索する。索引が無い場合は LIKE にフォールバックする
-// ので、`finder index` を実行する前でも一通り使える。
+// SearchWorks は作品を検索する。
 func (s *Store) SearchWorks(ctx context.Context, p SearchParams) (*SearchResult, error) {
 	if p.Page < 1 {
 		p.Page = 1
@@ -184,24 +180,12 @@ func (s *Store) SearchWorks(ctx context.Context, p SearchParams) (*SearchResult,
 	if p.Per < 1 || p.Per > 200 {
 		p.Per = 50
 	}
-	useFTS := s.HasIndex && !p.Like
-
 	b := &builder{}
 	b.from = append(b.from, "FROM images i")
-
-	if s.HasIndex {
-		b.from = append(b.from, "JOIN "+AttachAlias+".image_meta m ON m.image_id = i.id")
-		b.sel = append(b.sel,
-			"m.year_start", "m.year_end", "m.year_kind", "m.date_precision",
-			"m.has_title_ja", "m.artist_count", "m.creator_count", "m.person_count")
-	} else {
-		b.notes = append(b.notes,
-			"index.db がないため LIKE 検索です。`finder index` を実行すると全文検索と正規化済みの制作年が使えます")
-		b.sel = append(b.sel,
-			"i.date_raw_start", "i.date_raw_end",
-			"CASE WHEN i.date_raw_start IS NOT NULL OR i.date_raw_end IS NOT NULL THEN 'raw' ELSE '' END",
-			"''", "CASE WHEN tj.image_id IS NOT NULL THEN 1 ELSE 0 END", "-1", "-1", "-1")
-	}
+	b.from = append(b.from, "JOIN "+AttachAlias+".image_meta m ON m.image_id = i.id")
+	b.sel = append(b.sel,
+		"m.year_start", "m.year_end", "m.year_kind", "m.date_precision",
+		"m.has_title_ja", "m.artist_count", "m.creator_count", "m.person_count")
 	b.from = append(b.from,
 		"LEFT JOIN image_translations tj ON tj.image_id = i.id AND tj.field = 'title' AND tj.lang = 'ja'")
 
@@ -213,11 +197,6 @@ func (s *Store) SearchWorks(ctx context.Context, p SearchParams) (*SearchResult,
 
 	if q := strings.TrimSpace(p.Q); q != "" {
 		switch {
-		case !useFTS:
-			// LIKE モード: 原題・訳題・作者・説明文を横断する。
-			b.addWhere(
-				"(i.title LIKE ? OR tj.text LIKE ? OR i.artist LIKE ? OR i.description LIKE ?)",
-				like(q), like(q), like(q), like(q))
 		case p.Raw:
 			latinExpr = append(latinExpr, "("+q+")")
 		default:
@@ -236,28 +215,23 @@ func (s *Store) SearchWorks(ctx context.Context, p SearchParams) (*SearchResult,
 	}
 
 	if a := strings.TrimSpace(p.Artist); a != "" {
-		if useFTS {
-			var terms []string
-			for _, tok := range strings.Fields(a) {
-				if hasCJK(tok) {
-					// 作者の日本語名は search_ja 側にある。
-					if len([]rune(tok)) >= 3 {
-						jaExpr = append(jaExpr, ftsQuote(tok))
-					} else {
-						b.addWhere("EXISTS (SELECT 1 FROM image_artist_names an "+
-							"JOIN image_artists ia ON ia.id = an.image_artist_id "+
-							"WHERE ia.image_id = i.id AND an.name LIKE ?)", like(tok))
-					}
-					continue
+		var terms []string
+		for _, tok := range strings.Fields(a) {
+			if hasCJK(tok) {
+				// 作者の日本語名は search_ja 側にある。
+				if len([]rune(tok)) >= 3 {
+					jaExpr = append(jaExpr, ftsQuote(tok))
+				} else {
+					b.addWhere("EXISTS (SELECT 1 FROM image_artist_names an "+
+						"JOIN image_artists ia ON ia.id = an.image_artist_id "+
+						"WHERE ia.image_id = i.id AND an.name LIKE ?)", like(tok))
 				}
-				terms = append(terms, "artist:"+ftsQuote(tok)+"*")
+				continue
 			}
-			if len(terms) > 0 {
-				latinExpr = append(latinExpr, "("+strings.Join(terms, " AND ")+")")
-			}
-		} else {
-			b.addWhere("(i.artist LIKE ? OR EXISTS (SELECT 1 FROM image_artists ia "+
-				"WHERE ia.image_id = i.id AND ia.name_raw LIKE ?))", like(a), like(a))
+			terms = append(terms, "artist:"+ftsQuote(tok)+"*")
+		}
+		if len(terms) > 0 {
+			latinExpr = append(latinExpr, "("+strings.Join(terms, " AND ")+")")
 		}
 	}
 
@@ -296,10 +270,7 @@ func (s *Store) SearchWorks(ctx context.Context, p SearchParams) (*SearchResult,
 			p.PersonKey)
 	}
 
-	yearStart, yearEnd := "i.date_raw_start", "i.date_raw_end"
-	if s.HasIndex {
-		yearStart, yearEnd = "m.year_start", "m.year_end"
-	}
+	yearStart, yearEnd := "m.year_start", "m.year_end"
 	// 期間の指定は「重なり」で判定する。1450–1550 の作品は 1500 年代の検索に出る。
 	if p.YearFrom != nil {
 		b.addWhere(fmt.Sprintf("coalesce(%s, %s) >= ?", yearEnd, yearStart), *p.YearFrom)
@@ -307,35 +278,26 @@ func (s *Store) SearchWorks(ctx context.Context, p SearchParams) (*SearchResult,
 	if p.YearTo != nil {
 		b.addWhere(fmt.Sprintf("coalesce(%s, %s) <= ?", yearStart, yearEnd), *p.YearTo)
 	}
-	if s.HasIndex {
-		switch p.YearKind {
-		case "normalized", "raw":
-			b.addWhere("m.year_kind = ?", p.YearKind)
-		case "none":
-			b.addWhere("m.year_kind = ''")
-		}
-		if len(p.Precision) > 0 {
-			b.addWhere("m.date_precision IN ("+placeholders(len(p.Precision))+")", toAny(p.Precision)...)
-		}
-		switch p.HasJa {
-		case "1":
-			b.addWhere("m.has_title_ja = 1")
-		case "0":
-			b.addWhere("m.has_title_ja = 0")
-		}
-		switch p.ArtistCond {
-		case "unmatched":
-			b.addWhere("m.artist_count > 0 AND m.person_count = 0")
-		case "none":
-			b.addWhere("m.artist_count = 0")
-		}
-	} else {
-		switch p.HasJa {
-		case "1":
-			b.addWhere("tj.image_id IS NOT NULL")
-		case "0":
-			b.addWhere("tj.image_id IS NULL")
-		}
+	switch p.YearKind {
+	case "normalized", "raw":
+		b.addWhere("m.year_kind = ?", p.YearKind)
+	case "none":
+		b.addWhere("m.year_kind = ''")
+	}
+	if len(p.Precision) > 0 {
+		b.addWhere("m.date_precision IN ("+placeholders(len(p.Precision))+")", toAny(p.Precision)...)
+	}
+	switch p.HasJa {
+	case "1":
+		b.addWhere("m.has_title_ja = 1")
+	case "0":
+		b.addWhere("m.has_title_ja = 0")
+	}
+	switch p.ArtistCond {
+	case "unmatched":
+		b.addWhere("m.artist_count > 0 AND m.person_count = 0")
+	case "none":
+		b.addWhere("m.artist_count = 0")
 	}
 
 	switch p.Sort {

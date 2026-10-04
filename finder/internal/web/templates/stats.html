@@ -69,7 +69,6 @@
 
 <section>
   <h2>索引 (index.db)</h2>
-  {{if $s.Index.Present}}
   <table class="grid kv">
     <tr><th>パス</th><td><code>{{$s.Index.Path}}</code></td></tr>
     <tr><th>作成</th><td>{{$s.Index.BuiltAt}}</td></tr>
@@ -78,9 +77,6 @@
     <tr><th>索引した作品数</th><td>{{comma $s.Index.IndexedImages}} <span class="muted">(現在 {{comma $s.Index.CurrentImages}})</span></td></tr>
     <tr><th>状態</th><td>{{if $s.Index.Stale}}<span class="null">古い — 作り直してください</span>{{else}}最新{{end}}</td></tr>
   </table>
-  {{else}}
-  <p class="muted">index.db がありません。</p>
-  {{end}}
 </section>
 {{end}}
 

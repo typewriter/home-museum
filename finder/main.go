@@ -30,7 +30,6 @@ func main() {
 	dbPath := fs.String("db", env("DATABASE_PATH", "../importer/hm.db"), "hm.db のパス (読み取り専用で開く)")
 	indexPath := fs.String("index", env("FINDER_INDEX", "./index.db"), "検索インデックスのパス")
 	addr := fs.String("addr", env("FINDER_ADDR", "127.0.0.1:8081"), "待ち受けアドレス")
-	allowSQL := fs.Bool("sql", true, "読み取り専用 SQL コンソールを有効にする")
 	timeout := fs.Duration("timeout", 30*time.Second, "1 クエリの上限時間")
 	fs.Usage = func() {
 		fmt.Fprintf(os.Stderr, `finder — importer/hm.db を探索する内部ツール
@@ -74,7 +73,6 @@ func main() {
 			DBPath:    *dbPath,
 			IndexPath: *indexPath,
 			Addr:      *addr,
-			AllowSQL:  *allowSQL,
 			Timeout:   *timeout,
 		})
 	}
@@ -85,7 +83,6 @@ func main() {
 
 type serveOptions struct {
 	DBPath, IndexPath, Addr string
-	AllowSQL                bool
 	Timeout                 time.Duration
 }
 
@@ -97,14 +94,10 @@ func serve(ctx context.Context, o serveOptions) error {
 	defer st.Close()
 
 	log.Printf("hm.db  %s (読み取り専用)", st.DBPath)
-	if st.HasIndex {
-		log.Printf("index  %s", st.IndexPath)
-	} else {
-		log.Printf("index  なし — `finder index` を実行すると全文検索が使えます")
-	}
+	log.Printf("index  %s", st.IndexPath)
 
 	srv, err := web.New(st, web.Options{
-		AllowSQL: o.AllowSQL, QueryTimeout: o.Timeout,
+		QueryTimeout: o.Timeout,
 	})
 	if err != nil {
 		return err

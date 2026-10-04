@@ -154,20 +154,11 @@ func (s *Store) Stats(ctx context.Context) (*Stats, error) {
 		return nil, err
 	}
 
-	// 世紀ごとの分布。index.db があれば正規化済みの年を、無ければ館の生の年を使う。
-	centurySQL := `
+	if out.Centuries, err = s.Query(ctx, 0, `
 		SELECT CASE WHEN year_start IS NULL THEN '(年なし)'
 		            ELSE CAST(CAST(year_start / 100.0 AS INT) * 100 AS TEXT) END AS century,
 		       count(*) AS n
-		  FROM ` + AttachAlias + `.image_meta GROUP BY 1 ORDER BY 1`
-	if !s.HasIndex {
-		centurySQL = `
-		SELECT CASE WHEN date_raw_start IS NULL THEN '(年なし)'
-		            ELSE CAST(CAST(date_raw_start / 100.0 AS INT) * 100 AS TEXT) END AS century,
-		       count(*) AS n
-		  FROM images GROUP BY 1 ORDER BY 1`
-	}
-	if out.Centuries, err = s.Query(ctx, 0, centurySQL); err != nil {
+		  FROM `+AttachAlias+`.image_meta GROUP BY 1 ORDER BY 1`); err != nil {
 		return nil, err
 	}
 

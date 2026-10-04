@@ -53,9 +53,6 @@ type Store struct {
 	DB        *sql.DB
 	DBPath    string
 	IndexPath string
-	// HasIndex が false のときは FTS 検索と正規化済み制作年が使えない。
-	// UI 側はその旨を出したうえで LIKE 検索にフォールバックする。
-	HasIndex bool
 }
 
 func roDSN(path string) string {
@@ -63,7 +60,7 @@ func roDSN(path string) string {
 		"?mode=ro&_pragma=busy_timeout(10000)&_pragma=cache_size(-64000)"
 }
 
-// Open は hm.db を読み取り専用で開く。indexPath が存在すればそれも ATTACH する。
+// Open は hm.db を読み取り専用で開き、index.db を ATTACH する。
 func Open(dbPath, indexPath string) (*Store, error) {
 	abs, err := filepath.Abs(dbPath)
 	if err != nil {
@@ -72,23 +69,19 @@ func Open(dbPath, indexPath string) (*Store, error) {
 	if _, err := os.Stat(abs); err != nil {
 		return nil, fmt.Errorf("hm.db を開けません (%s): %w", abs, err)
 	}
-
-	st := &Store{DBPath: abs}
-	dsn := roDSN(abs)
-
-	if indexPath != "" {
-		if ia, err := filepath.Abs(indexPath); err == nil {
-			if _, err := os.Stat(ia); err == nil {
-				st.IndexPath = ia
-				st.HasIndex = true
-				attachMu.Lock()
-				attachByDSN[dsn] = roDSN(ia)
-				attachMu.Unlock()
-			} else {
-				st.IndexPath = ia
-			}
-		}
+	ia, err := filepath.Abs(indexPath)
+	if err != nil {
+		return nil, err
 	}
+	if _, err := os.Stat(ia); err != nil {
+		return nil, fmt.Errorf("index.db がありません (%s)。先に `finder index` で作ってください", ia)
+	}
+
+	st := &Store{DBPath: abs, IndexPath: ia}
+	dsn := roDSN(abs)
+	attachMu.Lock()
+	attachByDSN[dsn] = roDSN(ia)
+	attachMu.Unlock()
 	registerHook()
 
 	db, err := sql.Open("sqlite", dsn)
@@ -107,13 +100,11 @@ func Open(dbPath, indexPath string) (*Store, error) {
 		return nil, fmt.Errorf("hm.db に接続できません: %w", err)
 	}
 	// ATTACH が本当に効いたか (フックが動いたか) をここで確かめる。
-	if st.HasIndex {
-		var n int
-		if err := db.QueryRowContext(ctx,
-			`SELECT count(*) FROM ix.sqlite_master WHERE name='image_meta'`).Scan(&n); err != nil || n == 0 {
-			db.Close()
-			return nil, fmt.Errorf("index.db (%s) を ATTACH できましたが image_meta がありません。`finder index` で作り直してください", st.IndexPath)
-		}
+	var n int
+	if err := db.QueryRowContext(ctx,
+		`SELECT count(*) FROM ix.sqlite_master WHERE name='image_meta'`).Scan(&n); err != nil || n == 0 {
+		db.Close()
+		return nil, fmt.Errorf("index.db (%s) を ATTACH できましたが image_meta がありません。`finder index` で作り直してください", st.IndexPath)
 	}
 	st.DB = db
 	return st, nil
@@ -132,7 +123,6 @@ func (s *Store) Close() error {
 // IndexStatus はインデックスの鮮度。作った時点の images 件数・最終更新時刻を
 // 現在の hm.db と突き合わせ、ずれていれば UI に警告を出す。
 type IndexStatus struct {
-	Present       bool
 	Path          string
 	BuiltAt       string
 	SchemaVersion string
@@ -145,22 +135,16 @@ type IndexStatus struct {
 
 // Stale は再構築が要るかどうか。
 func (st IndexStatus) Stale() bool {
-	if !st.Present {
-		return true
-	}
 	return st.IndexedImages != st.CurrentImages || st.BuiltMaxUpd != st.CurrentMaxUpd
 }
 
 func (s *Store) IndexStatus(ctx context.Context) (IndexStatus, error) {
-	out := IndexStatus{Present: s.HasIndex, Path: s.IndexPath}
+	out := IndexStatus{Path: s.IndexPath}
 
 	if err := s.DB.QueryRowContext(ctx,
 		`SELECT count(*), coalesce(max(updated_at),'') FROM images`).
 		Scan(&out.CurrentImages, &out.CurrentMaxUpd); err != nil {
 		return out, err
-	}
-	if !s.HasIndex {
-		return out, nil
 	}
 	if fi, err := os.Stat(s.IndexPath); err == nil {
 		out.SizeBytes = fi.Size()

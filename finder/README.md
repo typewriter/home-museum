@@ -20,11 +20,9 @@ go run . serve          # http://127.0.0.1:8081
 | `-db` | `../importer/hm.db` | `DATABASE_PATH` |
 | `-index` | `./index.db` | `FINDER_INDEX` |
 | `-addr` | `127.0.0.1:8081` | `FINDER_ADDR` |
-| `-sql` | `true` (読み取り専用 SQL コンソール) | — |
 | `-timeout` | `30s` | — |
 
-索引が無くても起動する。その場合は全文検索が LIKE にフォールバックし、制作年は
-館の生値 (`images.date_raw_*`) だけを使う。画面上部に警告が出る。
+起動には索引 (`index.db`) が要る。先に `go run . index` を実行すること。
 
 ## hm.db には書かない
 
@@ -55,7 +53,7 @@ finder/index.db ──(mode=ro / ATTACH)──┘
 - 「Monet 睡蓮」のように混ざった入力は語ごとに振り分けて AND を取る
 
 FTS5 の式を直接書きたいときは「FTS5 の式をそのまま渡す」にチェックを入れる
-(`title:madonna NOT print` など)。索引を疑うときは「LIKE で引く」。
+(`title:madonna NOT print` など)。
 
 制作年の絞り込みは**期間の重なり**で判定する。1450–1550 の作品は「1500 年まで」で拾える。
 紀元前は負数 (`-500`)。
@@ -70,7 +68,6 @@ FTS5 の式を直接書きたいときは「FTS5 の式をそのまま渡す」�
 | `/artists/detail?key=` | 寄せられた生表記の内訳 (`name_raw` × 判定手法 × 件数) とソース別作品数 |
 | `/artists/unmatched` | `person_key IS NULL` の作者表記を件数の多い順に。名寄せの取りこぼしを潰す用 |
 | `/stats` | 派生層のカバレッジ (ソース × テーブル)、`date_precision` / `role_bucket` / 世紀別の分布、索引の状態。10 分キャッシュ (`?refresh=1` で再集計) |
-| `/sql` | 読み取り専用 SQL コンソール。`ix.` も参照できる。500 行で打ち切り |
 
 ## 既知の制約
 
@@ -80,6 +77,6 @@ FTS5 の式を直接書きたいときは「FTS5 の式をそのまま渡す」�
   そのまま使えない。「中世の宗教画」は今のところ
   「キーワード + 年レンジ + ソース別 style」で近似するしかない
 - 件数は 10,000 件で打ち切って `10,000+` と出す。全件を毎回数え切ると遅いため
-- `/stats` は初回 10 秒ほどかかる (`images` と `image_artists` の全走査を含む)
+- `/stats` は初回 1〜2 分かかる (`images` と `image_artists` の全走査を含む)
 - 日本語検索は `image_translations` が埋まっていないと機能しない。
   `ruby apply_translations.rb titles` の後に `go run . index` で作り直すこと

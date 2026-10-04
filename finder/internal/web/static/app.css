@@ -193,4 +193,3 @@ details.sqlpanel pre {
   background: var(--bg-sunken); border: 1px solid var(--border); border-radius: 4px;
   padding: 10px; overflow-x: auto; font-size: 12px; line-height: 1.5;
 }
-ul.samples { padding-left: 20px; line-height: 1.9; }

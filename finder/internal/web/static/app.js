@@ -29,17 +29,6 @@
     }
   });
 
-  // SQL コンソールは Ctrl+Enter / Cmd+Enter で実行。
-  var sql = document.querySelector('form.sqlform textarea');
-  if (sql) {
-    sql.addEventListener('keydown', function (e) {
-      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-        e.preventDefault();
-        sql.form.submit();
-      }
-    });
-  }
-
   // 表のセルはダブルクリックで全選択する。ID や person_key をコピーしやすくするため。
   document.querySelectorAll('table.grid').forEach(function (table) {
     table.addEventListener('dblclick', function (e) {

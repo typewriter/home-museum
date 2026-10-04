@@ -13,7 +13,6 @@
     <a href="/" class="{{if eq .Nav "search"}}on{{end}}">作品</a>
     <a href="/artists/" class="{{if eq .Nav "artists"}}on{{end}}">作者</a>
     <a href="/stats" class="{{if eq .Nav "stats"}}on{{end}}">カバレッジ</a>
-    {{if .AllowSQL}}<a href="/sql" class="{{if eq .Nav "sql"}}on{{end}}">SQL</a>{{end}}
   </nav>
   <span class="spacer"></span>
   <span class="dbinfo" title="hm.db は読み取り専用で開いています">
@@ -21,12 +20,7 @@
   </span>
 </header>
 
-{{if not .Index.Present}}
-<div class="banner warn">
-  index.db がありません。<code>go run . index</code> を実行すると全文検索・正規化済みの制作年・絞り込みの選択肢が使えるようになります。
-  いまは LIKE 検索にフォールバックしています。
-</div>
-{{else if .Index.Stale}}
+{{if .Index.Stale}}
 <div class="banner warn">
   索引が古くなっています
   (索引作成時 {{comma .Index.IndexedImages}} 件 / 現在 {{comma .Index.CurrentImages}} 件、

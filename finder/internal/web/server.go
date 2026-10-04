@@ -25,14 +25,13 @@ var assets embed.FS
 // 差し替える仕組みを持たないので、テンプレートセットをページ単位で作る。
 var pages = []string{
 	"search.html", "work.html", "artists.html", "artist.html",
-	"unmatched.html", "stats.html", "sql.html", "error.html",
+	"unmatched.html", "stats.html", "error.html",
 }
 
 // Server は 1 プロセスぶんの状態。
 type Server struct {
 	st        *store.Store
 	tpl       map[string]*template.Template
-	allowSQL  bool
 	queryWait time.Duration
 
 	// 索引の鮮度チェックは images の全走査を含むので、短時間キャッシュする。
@@ -50,8 +49,6 @@ type Server struct {
 }
 
 type Options struct {
-	// AllowSQL は読み取り専用 SQL コンソールを有効にする。
-	AllowSQL bool
 	// QueryTimeout は 1 リクエストあたりの上限。
 	QueryTimeout time.Duration
 }
@@ -63,7 +60,6 @@ func New(st *store.Store, opt Options) (*Server, error) {
 	s := &Server{
 		st:        st,
 		tpl:       map[string]*template.Template{},
-		allowSQL:  opt.AllowSQL,
 		queryWait: opt.QueryTimeout,
 		statusTTL: 60 * time.Second,
 	}
@@ -91,7 +87,6 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /artists/unmatched", s.handleUnmatched)
 	mux.HandleFunc("GET /artists/detail", s.handleArtist)
 	mux.HandleFunc("GET /stats", s.handleStats)
-	mux.HandleFunc("GET /sql", s.handleSQL)
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("ok\n"))
 	})
@@ -110,11 +105,10 @@ func logRequests(next http.Handler) http.Handler {
 
 // pageData は layout が使う共通部分。各ページ固有の値は Data に入れる。
 type pageData struct {
-	Title    string
-	Nav      string
-	Index    store.IndexStatus
-	AllowSQL bool
-	Data     any
+	Title string
+	Nav   string
+	Index store.IndexStatus
+	Data  any
 }
 
 func (s *Server) render(w http.ResponseWriter, r *http.Request, page, title, nav string, data any) {
@@ -124,11 +118,10 @@ func (s *Server) render(w http.ResponseWriter, r *http.Request, page, title, nav
 		return
 	}
 	pd := pageData{
-		Title:    title,
-		Nav:      nav,
-		Index:    s.indexStatus(r.Context()),
-		AllowSQL: s.allowSQL,
-		Data:     data,
+		Title: title,
+		Nav:   nav,
+		Index: s.indexStatus(r.Context()),
+		Data:  data,
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := t.Execute(w, pd); err != nil {

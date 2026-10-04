@@ -16,7 +16,7 @@ type Cell struct {
 	Text string
 }
 
-// Table は列名つきの汎用の結果表。作品詳細の生ダンプと SQL コンソールで共用する。
+// Table は列名つきの汎用の結果表。作品詳細などで生の行をそのまま出すのに使う。
 type Table struct {
 	Cols    []string
 	Rows    [][]Cell
@@ -27,8 +27,7 @@ type Table struct {
 
 func (t *Table) Empty() bool { return t == nil || len(t.Rows) == 0 }
 
-// Query は任意の SELECT を実行して Table に読む。接続は mode=ro なので、
-// 書き込み文はドライバの手前で SQLite に弾かれる。
+// Query は SELECT を実行して Table に読む。
 func (s *Store) Query(ctx context.Context, limit int, query string, args ...any) (*Table, error) {
 	start := time.Now()
 	rows, err := s.DB.QueryContext(ctx, query, args...)
@@ -149,11 +148,9 @@ func (s *Store) WorkDetail(ctx context.Context, id int64) (*WorkDetail, error) {
 		 WHERE ia.image_id = ? ORDER BY ia.position, n.lang`, id); err != nil {
 		return nil, err
 	}
-	if s.HasIndex {
-		if d.Meta, err = s.Query(ctx, 0,
-			`SELECT * FROM `+AttachAlias+`.image_meta WHERE image_id = ?`, id); err != nil {
-			return nil, err
-		}
+	if d.Meta, err = s.Query(ctx, 0,
+		`SELECT * FROM `+AttachAlias+`.image_meta WHERE image_id = ?`, id); err != nil {
+		return nil, err
 	}
 
 	prows, err := s.DB.QueryContext(ctx, `
@@ -394,25 +391,9 @@ type FacetValue struct {
 	N     int64
 }
 
-// Facets は index.db に焼いた選択肢を読む。索引が無いときは source だけ
-// hm.db から直接数える (462 件ある style を毎回 DISTINCT すると遅いため)。
+// Facets は index.db に焼いた選択肢を読む。
 func (s *Store) Facets(ctx context.Context) (map[string][]FacetValue, error) {
 	out := map[string][]FacetValue{}
-	if !s.HasIndex {
-		rows, err := s.DB.QueryContext(ctx, `SELECT source, count(*) FROM images GROUP BY source ORDER BY 2 DESC`)
-		if err != nil {
-			return out, err
-		}
-		defer rows.Close()
-		for rows.Next() {
-			var f FacetValue
-			if err := rows.Scan(&f.Value, &f.N); err != nil {
-				return out, err
-			}
-			out["source"] = append(out["source"], f)
-		}
-		return out, rows.Err()
-	}
 	rows, err := s.DB.QueryContext(ctx,
 		`SELECT kind, value, n FROM `+AttachAlias+`.facet ORDER BY kind, n DESC`)
 	if err != nil {

@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/typewriter/home-museum/finder/internal/store"
@@ -16,7 +15,6 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 	p := store.SearchParams{
 		Q:          q(r, "q"),
 		Raw:        qBool(r, "raw"),
-		Like:       qBool(r, "like"),
 		Sources:    qList(r, "source"),
 		Style:      q(r, "style"),
 		Category:   q(r, "category"),
@@ -152,27 +150,6 @@ func (s *Server) handleStats(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.render(w, r, "stats.html", "カバレッジ", "stats", map[string]any{"S": st, "ComputedAt": at})
-}
-
-func (s *Server) handleSQL(w http.ResponseWriter, r *http.Request) {
-	if !s.allowSQL {
-		s.fail(w, r, http.StatusNotFound, errors.New("SQL コンソールは無効です (-sql=false)"))
-		return
-	}
-	query := r.URL.Query().Get("sql")
-	data := map[string]any{"SQL": query, "Limit": 500}
-
-	if strings.TrimSpace(query) != "" {
-		ctx, cancel := context.WithTimeout(r.Context(), s.queryWait)
-		defer cancel()
-		t, err := s.st.Query(ctx, 500, query)
-		if err != nil {
-			data["Error"] = err.Error()
-		} else {
-			data["T"] = t
-		}
-	}
-	s.render(w, r, "sql.html", "SQL", "sql", data)
 }
 
 // stats はカバレッジ計算をキャッシュする。images と image_artists の全走査を
