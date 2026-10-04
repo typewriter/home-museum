@@ -1,6 +1,5 @@
-# .dockerignore のパターンは context のルートからの相対で照合される (.gitignore と
-# 違って再帰的には効かない) ので、imagecache/ が internal/imagecache/ を巻き込む
-# 心配は無い。それでも意図を明示するため先頭に / を付けておく。
+# 先頭の / は不要 (.dockerignore は再帰的に効かない) だが、internal/imagecache/ を
+# 巻き込まない意図を明示するために付けておく。
 
 # DB もキャッシュもイメージには入れない (volume で渡す)。
 /index.db

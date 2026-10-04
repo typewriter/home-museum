@@ -224,10 +224,7 @@ func (s *Store) SearchWorks(ctx context.Context, p SearchParams) (*SearchResult,
 }
 
 // SearchSourceURLs は同じ条件で source_url だけを返す。コレクションへの
-// 一括追加に使う。メンバーのキーは source_url (spec_collections.md §3) なので、
-// ここで id を引いても意味がない。
-//
-// 追加は「その時点の検索結果を行に展開する」操作で、条件は保存しない。
+// 一括追加に使う (メンバーのキーは source_url。spec_collections.md §3)。
 func (s *Store) SearchSourceURLs(ctx context.Context, p SearchParams, limit int) ([]string, error) {
 	b := s.searchBuilder(&p)
 	query := "SELECT i.source_url\n" + b.body() + "\n" + b.order +

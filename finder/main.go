@@ -165,9 +165,7 @@ func serve(ctx context.Context, o serveOptions) error {
 	return hs.ListenAndServe()
 }
 
-// collections は collections.db と git 用テキストの間を往復する。
-// spec_collections.md §6 — 復旧できない唯一のファイルなので、バックアップと
-// レビューは git に任せる。
+// collections は collections.db と git 用テキストの間を往復する (spec_collections.md §6)。
 func collections(ctx context.Context, dbPath, indexPath, collPath, dir, sub string) error {
 	if collPath == "" {
 		return errors.New("-collections が空です。コレクションが無効になっています")

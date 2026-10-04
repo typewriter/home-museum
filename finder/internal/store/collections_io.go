@@ -1,9 +1,5 @@
 // コレクションの git へのエクスポート / インポート。spec_collections.md §6。
-//
-// collections.db は壊れたら復旧できない唯一のファイルなので、テキストに出して
-// git に置けるようにする。メタ情報は 1 枚の YAML に、メンバーはコレクション
-// ごとの CSV に分ける (importer の titles_ja_*.csv と同じ扱いで、行単位の
-// diff が読めるように)。
+// メタ情報は 1 枚の YAML に、メンバーはコレクションごとの CSV に分ける。
 package store
 
 import (
@@ -85,8 +81,7 @@ func (s *Store) ExportCollections(ctx context.Context, dir string, log io.Writer
 	}
 	fmt.Fprintf(log, "%s に %d コレクション / %d 件を書き出しました\n", dir, len(cols), total)
 
-	// 消えたコレクションの CSV は自動では消さない。人手の成果物を機械が
-	// 消さない、という方針 (spec_collections.md §7)。
+	// 消えたコレクションの CSV は自動では消さない。人手の成果物を機械が消さないため。
 	if stale, _ := staleCSV(dir, cols); len(stale) > 0 {
 		fmt.Fprintf(log, "注意: 対応するコレクションが無い CSV があります (削除は手動で): %v\n", stale)
 	}
@@ -228,7 +223,7 @@ func (s *Store) ImportCollections(ctx context.Context, dir string, log io.Writer
 }
 
 // readCSV は <slug>.csv を読む。無ければメンバー 0 件として扱う
-// (ルールだけ書いてまだ集めていない状態を許す)。
+// (メタ情報だけ書いて、まだ集めていない状態を許す)。
 func readCSV(path string) ([][]string, error) {
 	f, err := os.Open(path)
 	if os.IsNotExist(err) {

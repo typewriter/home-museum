@@ -24,10 +24,7 @@ RUN apt-get update \
 
 COPY --from=build /out/finder /app/finder
 
-# 書き込み先は画像キャッシュの状態 DB だけ。hm.db / index.db は volume で
-# 読み取り専用に渡す (docker-compose.yml)。
-#
-# /var/lib/finder には cache.db を置いたディレクトリを bind mount するので、
+# /var/lib/finder には cache.db と collections.db のディレクトリを bind mount するので、
 # 実際の所有者はホスト側のものになる。compose は user: でホストの UID を渡す。
 # docker run で直接使うときは --user を合わせないと書き込めない。
 RUN mkdir -p /var/lib/finder && chown 10001:10001 /var/lib/finder

@@ -1,11 +1,5 @@
-// コレクション。設計は spec_collections.md。
-//
-// finder が唯一の書き手になる初めてのデータで、人の操作でしか増えない。
-// hm.db / index.db / cache.db のどれとも寿命が違うので 4 つ目のファイル
-// collections.db に置き、`co.` として ATTACH する (§1)。
-//
-// メンバーのキーは images.id ではなく source_url (§3)。hm.db を作り直すと
-// id は変わるが、コレクションには派生層のような「作り直せばよい」逃げ道がない。
+// コレクション。設計は spec_collections.md。collections.db を `co.` として
+// ATTACH して読み書きする。メンバーのキーは images.id ではなく source_url (§3)。
 package store
 
 import (

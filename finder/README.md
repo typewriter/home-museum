@@ -56,11 +56,6 @@ finder/collections.db ──(読み書き / ATTACH)──┘
    人の操作 (これだけ作り直せない)
 ```
 
-**ATTACH 先はメイン接続の読み取り専用フラグを継承しない。** 読ませたいだけの
-DB には DSN に `mode=ro` を明示すること。コレクションが同じ接続で書けるのは
-この性質のおかげで、逆に言えば `mode=ro` を書き忘れた ATTACH は書けてしまう
-(`spec_collections.md` §2 に実測)。
-
 `index.db` と `collections.db` はどちらも `.gitignore` 済み。ただし
 **`collections.db` だけは復旧できない**ので、`go run . collections export` で
 `collections/` 以下のテキストに出して git に置く。
@@ -100,9 +95,7 @@ FTS5 の式を直接書きたいときは「FTS5 の式をそのまま渡す」�
 「浮世絵」「フレスコの宗教画」のような主題別の作品集。設計は
 [`spec_collections.md`](spec_collections.md)。
 
-データは **1 コレクションが複数の作品を持つ**だけで、テーブルは 2 枚しかない。
-**検索条件は保存しない** — 検索は作品を集める作業の道具であって、コレクションの
-定義ではない。追加した時点の作品が行として残るので、あとから `hm.db` が変わっても
+**検索条件は保存せず、選んだ作品だけを保存する。** あとから `hm.db` が変わっても
 メンバーは勝手に増減しない。
 
 集め方は 3 つ:
@@ -111,15 +104,14 @@ FTS5 の式を直接書きたいときは「FTS5 の式をそのまま渡す」�
 - 検索結果の行ごとの「＋」
 - 作品ページ (`/works/{id}`) と作者ページから
 
-メンバーのキーは `images.id` ではなく **`source_url`**。`hm.db` を作り直すと `id`
-は変わるが、コレクションには派生層のような「作り直せばよい」逃げ道がないため
-(§3)。副作用として **`hm.db` にまだ無い作品も指せる** ので、館の URL を控えて
-おいてクロール後に合流させられる。解決できないメンバーは「未解決」として件数が出る。
+メンバーは `images.id` ではなく `source_url` で持つ (§3)。`hm.db` にまだ無い作品も
+指せるので、館の URL を控えておいてクロール後に合流させられる。解決できない
+メンバーは「未解決」として件数が出る。
 
 ### git に出す
 
 `collections.db` は壊れたら復旧できない唯一のファイルなので、テキストに出して
-git に置く (§6)。
+git に置く。
 
 ```bash
 go run . collections export   # → collections/collections.yaml + <slug>.csv
@@ -127,8 +119,7 @@ go run . collections import   # ← YAML を正本として collections.db を�
 ```
 
 - `collections.yaml` — コレクションのメタ情報。全部で 1 ファイル
-- `collections/<slug>.csv` — `source_url, position, note`。
-  `importer/titles_ja_*.csv` と同じ扱いで、行単位の diff が読める
+- `collections/<slug>.csv` — `source_url, position, note`。行単位の diff が読める
 
 保存のたびに自動では書き出さない (git の作業ツリーが常に汚れるため)。
 
@@ -176,10 +167,8 @@ caddy-host が作る外部ネットワーク `homemuseum` に参加させ、`FIN
 定義は `../caddy-host/Caddyfile` 側にある。ルート `/` は finder 以外の将来の
 アプリのために空けてある。
 
-finder はテンプレート・リダイレクトの絶対パスすべてに `-base-path` /
-`FINDER_BASE_PATH` を前置してから出す (`internal/web/server.go` の `u()`)。パス
-以外のところ (ホストベースルーティングなど) で公開する場合は
-`FINDER_BASE_PATH` を空のままにしてよい。
+パス以外 (ホストベースルーティングなど) で公開する場合は `FINDER_BASE_PATH` を
+空のままにしてよい。
 
 ## 既知の制約
 
