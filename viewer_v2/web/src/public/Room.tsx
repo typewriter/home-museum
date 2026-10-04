@@ -138,7 +138,7 @@ function Caption({ work: w }: { work: Work }) {
       )}
       <p className="caption-source">
         <a href={w.source_url} target="_blank" rel="noopener noreferrer" className="text-link">
-          {sourceNames[w.source] ?? w.source}で見る ↗
+          {sourceNames[w.source] ?? w.source}の作品詳細ページへ ↗
         </a>
       </p>
       <p className="caption-hint">← → キー、またはスワイプで移動</p>
