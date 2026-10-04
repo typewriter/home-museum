@@ -6,7 +6,7 @@
  *
  * 面積は 60-30-10 に配分する。
  *   60% --paper   作品を並べる地 (展覧会の一覧・図録)
- *   30% --tone    画面幅いっぱいの帯 (ヘッダーと導入、入口、作者の検索欄)
+ *   30% --tone    画面幅いっぱいの帯 (トップの展覧会の一覧、入口)
  *   10% --accent  ボタンとフッター
  * 展示室 (1 作品ずつ見る画面) はこの配分の外で、作品に目が行くよう暗くする。
  * 区切りは罫線ではなく余白と面 (薄い灰色の塗り) で付ける。
@@ -27,8 +27,6 @@
   --room-ink: hsl(0 0% 92%);
   --room-ink-2: hsl(0 0% 56%);
   --room-tone: hsl(0 0% 11%);
-
-  --font: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
 
   --fs-xs: 0.75rem;
   --fs-s: 0.875rem;
@@ -57,7 +55,6 @@ body {
   margin: 0;
   background: var(--paper);
   color: var(--ink);
-  font-family: var(--font);
   font-size: var(--fs-m);
   line-height: 1.8;
   -webkit-font-smoothing: antialiased;
@@ -113,7 +110,6 @@ button {
 
 .site-header {
   padding-block: var(--s4);
-  background: var(--tone);
 }
 
 /* 30% の帯。中の要素は地 (--paper) の色に反転させ、帯と同化させない */
@@ -126,17 +122,8 @@ button {
   background: var(--paper);
 }
 
-.search-panel {
-  margin-top: var(--s6);
+.exhibitions-band {
   padding-block: var(--s6);
-}
-
-.search-panel .section-heading {
-  margin-bottom: var(--s3);
-}
-
-.artist-results {
-  padding-top: var(--s4);
 }
 
 .site-footer {

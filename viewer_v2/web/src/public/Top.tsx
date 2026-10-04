@@ -14,16 +14,15 @@ export function Top() {
     <>
       <Header />
       <main>
-        <section className="band intro">
-          <div className="container">
+        <section className="container intro">
           <h1 className="display">
             気軽に楽しむ、<wbr />名画の世界
           </h1>
           <p className="intro-note">※当サイトの作品は、すべてパブリックドメイン（著作権の切れたもの）です。</p>
-          </div>
         </section>
 
-        <section className="container section">
+        <section className="band exhibitions-band">
+          <div className="container">
           <SectionHeading en="Exhibitions">開催中の展覧会</SectionHeading>
           {cols.status === "ok" && cols.data.collections.length === 0 && (
             <p className="muted">いまは展覧会がありません。作者から作品を探せます。</p>
@@ -45,6 +44,7 @@ export function Top() {
                   </div>
                 </Link>
               ))}
+          </div>
           </div>
         </section>
 
@@ -77,20 +77,15 @@ function ArtistSearch() {
   }, [q]);
 
   return (
-    <>
-      <section className="band search-panel">
-        <div className="container">
-          <SectionHeading en="Artists">作者から探す</SectionHeading>
-          <input
-            className="search"
-            type="search"
-            placeholder="作者名で探す (例: Monet、北斎)"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-          />
-        </div>
-      </section>
-      <section className="container page artist-results">
+    <section className="container section page">
+      <SectionHeading en="Artists">作者から探す</SectionHeading>
+      <input
+        className="search"
+        type="search"
+        placeholder="作者名で探す (例: Monet、北斎)"
+        value={q}
+        onChange={(e) => setQ(e.target.value)}
+      />
         {!q.trim() && <p className="note">作品の多い作者</p>}
         <ul className="artist-list">
           {artists?.slice(0, q.trim() ? undefined : defaultArtists).map((a) => (
@@ -107,7 +102,6 @@ function ArtistSearch() {
           ))}
         </ul>
         {artists?.length === 0 && <p className="muted">見つかりませんでした。</p>}
-      </section>
-    </>
+    </section>
   );
 }
