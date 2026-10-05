@@ -1,0 +1,23 @@
+services:
+  viewer:
+    build:
+      context: .
+    # bind mount した data/ に書けるよう、ホスト側の所有者に合わせる。
+    user: "${UID:-1000}:${GID:-1000}"
+    ports:
+      - "8080:8080"
+    environment:
+      R2_ACCOUNT_ID: ${R2_ACCOUNT_ID:?}
+      R2_BUCKET: ${R2_BUCKET:?}
+      R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID:?}
+      R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY:?}
+      VIEWER_BASE_URL: ${VIEWER_BASE_URL:-}
+      VIEWER_ARTIST_MIN_WORKS: ${VIEWER_ARTIST_MIN_WORKS:-20}
+      VIEWER_ADMIN_USER: ${VIEWER_ADMIN_USER:-admin}
+      VIEWER_ADMIN_PASSWORD: ${VIEWER_ADMIN_PASSWORD:-}
+    volumes:
+      # viewer.db は WAL なので、ファイル単体ではなくディレクトリごと渡す。
+      # ファイル単体だと -wal / -shm がコンテナ側に取り残され、チェックポイント前の
+      # 書き込みがコンテナの破棄と一緒に消える。import する works.db もここに置く。
+      - ${VIEWER_DATA_DIR:-./data}:/var/lib/viewer
+    restart: unless-stopped

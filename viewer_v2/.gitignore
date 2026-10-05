@@ -9,3 +9,4 @@
 !/web/dist/.gitkeep
 .env
 .envrc
+/data/

@@ -64,3 +64,53 @@ import が取り込み層のテーブルしか DROP しないことはテスト 
 **作者の作品数 (`artists.work_count`) は export で数え直す。** hm.db の
 `artists.image_count` は画像の無い作品や、出版社・刷り師としての関与
 (`role_bucket = 'non_creator'`) まで数えていて、公開する作者を選ぶ閾値に使えない。
+
+## 管理画面
+
+`/admin` と `/api/admin/*` は basic 認証で守る。資格情報は環境変数の 1 組だけで、
+`VIEWER_ADMIN_PASSWORD` が空なら管理画面は 503 を返して閉じる (ユーザー名は
+`VIEWER_ADMIN_USER`、既定は `admin`)。設定し忘れたまま公開しても、管理画面が開かないように。
+
+basic 認証は平文で資格情報を送るので、公開するときは HTTPS の後ろに置くこと。
+また、資格情報はクロスサイトのリクエストにもブラウザが付けるので、書き込み系の
+管理 API は同一オリジンに限っている (`internal/web/api_admin.go`)。
+
+## デプロイ (docker compose)
+
+`.env` に `R2_ACCOUNT_ID` / `R2_BUCKET` / `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY`、
+`VIEWER_ADMIN_PASSWORD`、`VIEWER_BASE_URL` (例: `https://uchibi.nyamikan.net`) を書く。
+
+```bash
+mkdir -p data                  # viewer.db はここに置く
+docker compose up -d --build   # 8080 で待ち受ける
+```
+
+**`data/` は compose より先に自分で作る。** 無いまま起動すると Docker が root の持ち物として
+作り、コンテナ (ホストの UID で動く) が viewer.db を作れずに「所有層のスキーマを作れません」で止まる。
+
+パスは `/api` や `/img` を絶対パスで持っているので、リバースプロキシではドメインの直下に置く。
+
+### 作品データの入れ替え
+
+**import の前に VPS のスナップショットを取る。** viewer_v2 はバックアップの機能を持たず、
+コレクション (人の手でしか作れない) を守るのはこのスナップショットだけになる。
+
+```bash
+# ローカル
+go run . export -hm ../importer/hm.db -out works.db
+scp works.db vps:home-museum/viewer_v2/data/
+
+# VPS (サービスを止めてから)
+docker compose stop viewer
+docker compose run --rm viewer /app/viewer_v2 import works.db
+docker compose start viewer
+rm data/works.db
+```
+
+### finder からの移行 (1 回だけ)
+
+finder の `cache.db` を `data/` に置いてから、画像キャッシュの状態を移す。
+
+```bash
+docker compose run --rm viewer /app/viewer_v2 migrate-cache finder-cache.db
+```
