@@ -1,0 +1,10 @@
+*.db
+*.db-shm
+*.db-wal
+*.db.tmp
+/viewer_v2
+/imagecache/
+/web/node_modules/
+/web/dist/*
+!/web/dist/.gitkeep
+.env
