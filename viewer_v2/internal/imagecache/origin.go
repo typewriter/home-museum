@@ -43,7 +43,14 @@ func OriginURL(r Ref, width int) string {
 		return ""
 	}
 	switch r.Source {
-	case "aic", "rijksmuseum":
+	case "aic":
+		// AIC は 1 回に返す面積を maxArea (3,109,500 px) までに絞っていて、超えると
+		// 403 を返す。幅指定 (1600,) だと縦長の作品で超える (1600×2605 ≒ 417 万)。
+		// 1600×1600 の枠に収める指定 (!1600,1600) なら最大 256 万で必ず収まる。
+		if m := iiifSize.FindStringSubmatchIndex(r.ImageURL); m != nil {
+			return r.ImageURL[:m[2]] + fmt.Sprintf("!%d,%d", width, width) + r.ImageURL[m[3]:]
+		}
+	case "rijksmuseum":
 		if m := iiifSize.FindStringSubmatchIndex(r.ImageURL); m != nil {
 			return r.ImageURL[:m[2]] + fmt.Sprintf("%d,", width) + r.ImageURL[m[3]:]
 		}
