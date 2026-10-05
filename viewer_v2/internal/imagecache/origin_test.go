@@ -12,10 +12,10 @@ func TestOriginURL(t *testing.T) {
 		want  string
 	}{
 		{
-			name:  "aic は full/full を幅指定に置き換える",
+			name:  "aic は full/full を 1600×1600 の枠に収める指定に置き換える (maxArea を超えない)",
 			ref:   Ref{Source: "aic", ImageURL: "https://www.artic.edu/iiif/2/03c0fd45/full/full/0/default.jpg"},
 			width: 1600,
-			want:  "https://www.artic.edu/iiif/2/03c0fd45/full/1600,/0/default.jpg",
+			want:  "https://www.artic.edu/iiif/2/03c0fd45/full/!1600,1600/0/default.jpg",
 		},
 		{
 			name:  "rijksmuseum は full/max を幅指定に置き換える",

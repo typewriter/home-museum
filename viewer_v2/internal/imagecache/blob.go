@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
@@ -118,6 +119,7 @@ func (l *localBlob) Describe() string { return "local:" + l.root }
 
 type r2Blob struct {
 	cl     *minio.Client
+	sig    sigV4
 	bucket string
 	label  string
 }
@@ -158,7 +160,12 @@ func openR2() (Blob, error) {
 	if err != nil {
 		return nil, fmt.Errorf("R2 クライアントを作れません: %w", err)
 	}
-	return &r2Blob{cl: cl, bucket: bucket, label: "r2://" + bucket + " (" + endpoint + ")"}, nil
+	return &r2Blob{
+		cl:     cl,
+		sig:    sigV4{host: endpoint, bucket: bucket, accessKey: access, secret: secret, region: "auto"},
+		bucket: bucket,
+		label:  "r2://" + bucket + " (" + endpoint + ")",
+	}, nil
 }
 
 func (r *r2Blob) Put(ctx context.Context, key string, rd io.Reader, size int64, ct string) error {
@@ -198,3 +205,7 @@ func (r *r2Blob) Stat(ctx context.Context, key string) (int64, error) {
 }
 
 func (r *r2Blob) Describe() string { return r.label }
+
+func (r *r2Blob) PresignGet(key string, signTime time.Time, expires time.Duration) string {
+	return r.sig.presign(key, signTime, expires)
+}
