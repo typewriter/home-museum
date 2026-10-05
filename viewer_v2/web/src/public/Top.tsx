@@ -29,7 +29,7 @@ export function Top() {
             バーチャルコレクション展
           </SectionHeading>
           {cols.status === "ok" && cols.data.collections.length === 0 && (
-            <p className="muted">いまは展覧会がありません。作者から作品を探せます。</p>
+            <p className="muted">いまは展覧会がありません。</p>
           )}
           {cols.status === "error" && <p className="muted">読み込めませんでした。</p>}
           <div className="card-grid">
@@ -51,8 +51,6 @@ export function Top() {
           </div>
           </div>
         </section>
-
-        <ArtistSearch />
       </main>
       <Footer />
     </>
@@ -62,7 +60,8 @@ export function Top() {
 // 検索語が無いときに並べる作者の数。トップを作者の一覧だけで埋めないため。
 const defaultArtists = 24;
 
-function ArtistSearch() {
+// トップには出していない。戻すときのために残す (export は noUnusedLocals を避けるため)。
+export function ArtistSearch() {
   const [q, setQ] = useState("");
   const [artists, setArtists] = useState<Artist[] | null>(null);
 
