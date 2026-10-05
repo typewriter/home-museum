@@ -43,7 +43,15 @@ func OriginURL(r Ref, width int) string {
 		return ""
 	}
 	switch r.Source {
-	case "aic", "rijksmuseum":
+	case "aic":
+		// AIC は原寸より大きく返す要求を 403 で断る (info.json の supports に
+		// sizeAboveFull が無い)。幅指定 (1600,) だと、幅が 1600px 未満の縦長の作品で
+		// 拡大の要求になる。1600×1600 の枠に収める指定 (!1600,1600) なら、長い辺が
+		// 1600px 以上の作品は縮小で済む。
+		if m := iiifSize.FindStringSubmatchIndex(r.ImageURL); m != nil {
+			return r.ImageURL[:m[2]] + fmt.Sprintf("!%d,%d", width, width) + r.ImageURL[m[3]:]
+		}
+	case "rijksmuseum":
 		if m := iiifSize.FindStringSubmatchIndex(r.ImageURL); m != nil {
 			return r.ImageURL[:m[2]] + fmt.Sprintf("%d,", width) + r.ImageURL[m[3]:]
 		}

@@ -17,6 +17,12 @@ go run . import -db viewer.db works.db
 go run . migrate-cache -db viewer.db -images r2 ../finder/cache.db
 ```
 
+```bash
+sudo apt install libvips-tools               # 画像の変換に要る
+go run . serve -images local:./imagecache    # 動作確認用 (R2 を使わない)
+go run . serve -images r2                    # R2_ACCOUNT_ID / R2_BUCKET / R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY
+```
+
 画像キャッシュの設計は [`spec_image_cache.md`](spec_image_cache.md)。
 
 ## viewer.db は 2 層を 1 ファイルに持つ
