@@ -17,6 +17,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -24,6 +25,7 @@ import (
 	"github.com/typewriter/home-museum/viewer_v2/internal/export"
 	"github.com/typewriter/home-museum/viewer_v2/internal/imagecache"
 	"github.com/typewriter/home-museum/viewer_v2/internal/web"
+	webdist "github.com/typewriter/home-museum/viewer_v2/web"
 )
 
 const usage = `viewer_v2 — home-museum の公開ビューア
@@ -32,7 +34,7 @@ const usage = `viewer_v2 — home-museum の公開ビューア
   viewer_v2 export [-hm ../importer/hm.db] [-out works.db]
   viewer_v2 import [-db viewer.db] works.db
   viewer_v2 migrate-cache [-db viewer.db] [-images r2] finder/cache.db
-  viewer_v2 serve [-db viewer.db] [-addr 127.0.0.1:8080] [-images r2]
+  viewer_v2 serve [-db viewer.db] [-addr 127.0.0.1:8080] [-images r2] [-artist-min-works 20]
 `
 
 func main() {
@@ -119,6 +121,8 @@ func runServe(ctx context.Context, args []string) error {
 		`画像の保管先。"r2" (要 R2_* 環境変数) / "local:<dir>" / 空で無効`)
 	interval := fs.Duration("image-interval", 10*time.Second, "館ごとの画像取得間隔")
 	quality := fs.Int("image-quality", 80, "WebP の品質 (0-100)")
+	minWorks := fs.Int("artist-min-works", envInt("VIEWER_ARTIST_MIN_WORKS", 20), "公開する作者の作品数の下限")
+	baseURL := fs.String("base-url", env("VIEWER_BASE_URL", ""), "OGP に使う公開 URL (例: https://uchibi.nyamikan.net)。空ならリクエストから組み立てる")
 	fs.Parse(args)
 
 	d, err := db.Open(ctx, *dbPath)
@@ -148,8 +152,10 @@ func runServe(ctx context.Context, args []string) error {
 	}
 
 	hs := &http.Server{
-		Addr:              *addr,
-		Handler:           web.New(web.Options{DB: d, Cache: cache}).Handler(),
+		Addr: *addr,
+		Handler: web.New(web.Options{
+			DB: d, Cache: cache, Dist: webdist.Dist(), ArtistMinWorks: *minWorks, BaseURL: *baseURL,
+		}).Handler(),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 	go func() {
@@ -160,6 +166,13 @@ func runServe(ctx context.Context, args []string) error {
 	}()
 	log.Printf("http://%s", *addr)
 	return hs.ListenAndServe()
+}
+
+func envInt(key string, def int) int {
+	if v, err := strconv.Atoi(os.Getenv(key)); err == nil {
+		return v
+	}
+	return def
 }
 
 func env(key, def string) string {
