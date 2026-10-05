@@ -150,6 +150,7 @@ func TestSPAInjectsMeta(t *testing.T) {
 	f.srv = New(Options{DB: f.db, ArtistMinWorks: 2, Dist: fstest.MapFS{
 		"index.html":  {Data: []byte("<html><head><script src=/assets/a.js></script></head><body></body></html>")},
 		"assets/a.js": {Data: []byte("x")},
+		"admin.html":  {Data: []byte("<html><head><title>管理</title></head></html>")},
 	}})
 
 	rec := f.get(t, "/c/pub")
@@ -168,6 +169,10 @@ func TestSPAInjectsMeta(t *testing.T) {
 		if rec := f.get(t, p); rec.Code != http.StatusNotFound || !strings.Contains(rec.Body.String(), "<title>おうちの美術館</title>") {
 			t.Errorf("%s: code = %d, want 404 で SPA を返す", p, rec.Code)
 		}
+	}
+
+	if rec := f.get(t, "/admin/c/3"); rec.Code != 200 || !strings.Contains(rec.Body.String(), "<title>管理</title>") {
+		t.Errorf("/admin 以下は admin.html: %d %s", rec.Code, rec.Body)
 	}
 
 	rec = f.get(t, "/assets/a.js")

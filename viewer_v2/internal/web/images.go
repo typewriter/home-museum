@@ -50,6 +50,18 @@ func (s *Server) imageRef(ctx context.Context, idStr string) (imagecache.Ref, bo
 	return r, err == nil, err
 }
 
+// imageRefByURL はコレクションに足した作品を積むときに使う。
+func (s *Server) imageRefByURL(ctx context.Context, sourceURL string) (imagecache.Ref, bool, error) {
+	r := imagecache.Ref{SourceURL: sourceURL}
+	err := s.db.R.QueryRowContext(ctx,
+		`SELECT id, source, image_url FROM works WHERE source_url = ?`, sourceURL,
+	).Scan(&r.ID, &r.Source, &r.ImageURL)
+	if errors.Is(err, sql.ErrNoRows) {
+		return r, false, nil
+	}
+	return r, err == nil, err
+}
+
 func (s *Server) imageWidth(r *http.Request) (int, bool) {
 	w, err := strconv.Atoi(r.PathValue("w"))
 	if err != nil || !slices.Contains(s.cache.Widths(), w) {
