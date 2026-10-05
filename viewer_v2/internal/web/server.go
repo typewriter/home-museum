@@ -18,6 +18,8 @@ type Options struct {
 	Dist           fs.FS             // Vite のビルド結果。nil なら画面を出さない
 	ArtistMinWorks int               // 公開する作者の作品数の下限
 	BaseURL        string            // OGP の絶対 URL。空ならリクエストから組み立てる
+	AdminUser      string            // 管理画面の basic 認証
+	AdminPassword  string            // 空なら管理画面を閉じる
 	Now            func() time.Time  // テスト用。nil なら time.Now
 }
 
@@ -29,6 +31,8 @@ type Server struct {
 	base  string
 	now   func() time.Time
 	mux   *http.ServeMux
+
+	adminUser, adminPassword string
 }
 
 func New(o Options) *Server {
@@ -36,6 +40,7 @@ func New(o Options) *Server {
 		db: o.DB, st: store.New(o.DB, o.ArtistMinWorks), cache: o.Cache,
 		spa: loadSPA(o.Dist), base: strings.TrimSuffix(o.BaseURL, "/"),
 		now: o.Now, mux: http.NewServeMux(),
+		adminUser: o.AdminUser, adminPassword: o.AdminPassword,
 	}
 	if s.now == nil {
 		s.now = time.Now

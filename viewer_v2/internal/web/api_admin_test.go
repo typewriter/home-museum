@@ -14,6 +14,7 @@ import (
 func (f *fixture) do(t *testing.T, method, path, body string, header ...string) *httptest.ResponseRecorder {
 	t.Helper()
 	req := httptest.NewRequest(method, path, strings.NewReader(body))
+	req.SetBasicAuth(testAdminUser, testAdminPassword)
 	for i := 0; i+1 < len(header); i += 2 {
 		req.Header.Set(header[i], header[i+1])
 	}

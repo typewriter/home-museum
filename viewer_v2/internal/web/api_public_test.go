@@ -147,7 +147,7 @@ func TestPublicArtists(t *testing.T) {
 
 func TestSPAInjectsMeta(t *testing.T) {
 	f := newDBFixture(t)
-	f.srv = New(Options{DB: f.db, ArtistMinWorks: 2, Dist: fstest.MapFS{
+	f.srv = New(Options{DB: f.db, ArtistMinWorks: 2, AdminUser: testAdminUser, AdminPassword: testAdminPassword, Dist: fstest.MapFS{
 		"index.html":  {Data: []byte("<html><head><script src=/assets/a.js></script></head><body></body></html>")},
 		"assets/a.js": {Data: []byte("x")},
 		"admin.html":  {Data: []byte("<html><head><title>管理</title></head></html>")},

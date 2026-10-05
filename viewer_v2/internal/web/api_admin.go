@@ -11,12 +11,11 @@ import (
 	"github.com/typewriter/home-museum/viewer_v2/internal/store"
 )
 
-// 管理 API の認証は手前の Caddy の basic_auth に任せる (/admin* と /api/admin/*)。
 // basic 認証の資格情報はクロスサイトのリクエストにもブラウザが付けてしまうので、
 // 書き込みは CrossOriginProtection (Sec-Fetch-Site / Origin) で同一オリジンに限る。
 func (s *Server) routeAdminAPI() {
 	cop := http.NewCrossOriginProtection()
-	h := func(pattern string, f http.HandlerFunc) { s.mux.Handle(pattern, cop.Handler(f)) }
+	h := func(pattern string, f http.HandlerFunc) { s.mux.Handle(pattern, s.requireAdmin(cop.Handler(f))) }
 
 	h("GET /api/admin/collections", s.adminCollections)
 	h("POST /api/admin/collections", s.adminSaveCollection)

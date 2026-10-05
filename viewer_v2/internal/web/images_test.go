@@ -43,7 +43,7 @@ func newImageFixture(t *testing.T) *fixture {
 	if err != nil {
 		t.Fatal(err)
 	}
-	f.srv = New(Options{DB: f.db, Cache: f.cache, Now: func() time.Time { return f.now }})
+	f.srv = New(Options{DB: f.db, Cache: f.cache, AdminUser: testAdminUser, AdminPassword: testAdminPassword, Now: func() time.Time { return f.now }})
 	mustExec(t, f.db, `INSERT INTO image_cache (url_hash, image_id, source, source_url, origin_url, state, variants, requested_at)
 		VALUES (?, 1, 'aic', 'https://a/1', 'x', 'ready', '400,1600', 'x')`, imagecache.Hash("https://a/1"))
 	return f
@@ -78,7 +78,7 @@ func newDBFixture(t *testing.T) *fixture {
 		(1, 'https://a/2', 0, 'x'), (1, 'https://a/1', 1, 'x'), (1, 'https://gone/9', 2, 'x'),
 		(2, 'https://m/3', 0, 'x')`)
 	f := &fixture{db: d, now: time.Date(2026, 10, 4, 15, 0, 0, 0, time.UTC)}
-	f.srv = New(Options{DB: d, ArtistMinWorks: 2, Now: func() time.Time { return f.now }})
+	f.srv = New(Options{DB: d, ArtistMinWorks: 2, AdminUser: testAdminUser, AdminPassword: testAdminPassword, Now: func() time.Time { return f.now }})
 	return f
 }
 
@@ -91,8 +91,10 @@ func mustExec(t *testing.T, d *db.DB, q string, args ...any) {
 
 func (f *fixture) get(t *testing.T, path string) *httptest.ResponseRecorder {
 	t.Helper()
+	req := httptest.NewRequest(http.MethodGet, path, nil)
+	req.SetBasicAuth(testAdminUser, testAdminPassword)
 	rec := httptest.NewRecorder()
-	f.srv.Handler().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
+	f.srv.Handler().ServeHTTP(rec, req)
 	return rec
 }
 

@@ -46,12 +46,12 @@ func (s *Server) routeSPA() {
 	s.mux.HandleFunc("GET /c/{slug}/{n}", s.spaExhibition(s.publicCollection))
 	s.mux.HandleFunc("GET /a/{key}", s.spaExhibition(s.publicArtist))
 	s.mux.HandleFunc("GET /a/{key}/{n}", s.spaExhibition(s.publicArtist))
-	s.mux.HandleFunc("GET /admin", s.spaAdmin)
-	s.mux.HandleFunc("GET /admin/", s.spaAdmin)
+	s.mux.Handle("GET /admin", s.requireAdmin(http.HandlerFunc(s.spaAdmin)))
+	s.mux.Handle("GET /admin/", s.requireAdmin(http.HandlerFunc(s.spaAdmin)))
 	s.mux.HandleFunc("GET /", s.spaRoot)
 }
 
-// spaAdmin は管理画面。認証は手前の Caddy が掛ける。OGP は要らない。
+// spaAdmin は管理画面。OGP は要らない。
 func (s *Server) spaAdmin(w http.ResponseWriter, r *http.Request) {
 	if s.spa.admin == nil {
 		http.Error(w, "画面がビルドされていません。web/ で npm run build を実行してください", http.StatusServiceUnavailable)

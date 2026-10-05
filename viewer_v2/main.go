@@ -123,7 +123,10 @@ func runServe(ctx context.Context, args []string) error {
 	quality := fs.Int("image-quality", 80, "WebP の品質 (0-100)")
 	minWorks := fs.Int("artist-min-works", envInt("VIEWER_ARTIST_MIN_WORKS", 20), "公開する作者の作品数の下限")
 	baseURL := fs.String("base-url", env("VIEWER_BASE_URL", ""), "OGP に使う公開 URL (例: https://uchibi.nyamikan.net)。空ならリクエストから組み立てる")
+	adminUser := fs.String("admin-user", env("VIEWER_ADMIN_USER", "admin"), "管理画面の basic 認証のユーザー名")
 	fs.Parse(args)
+	// パスワードはフラグにしない。ps やシェルの履歴に残るため。
+	adminPassword := os.Getenv("VIEWER_ADMIN_PASSWORD")
 
 	d, err := db.Open(ctx, *dbPath)
 	if err != nil {
@@ -131,6 +134,9 @@ func runServe(ctx context.Context, args []string) error {
 	}
 	defer d.Close()
 	log.Printf("viewer.db %s", d.Path)
+	if adminPassword == "" {
+		log.Printf("管理画面 無効 — VIEWER_ADMIN_PASSWORD で有効になります")
+	}
 
 	store, err := imagecache.OpenBlob(*images)
 	if err != nil {
@@ -155,6 +161,7 @@ func runServe(ctx context.Context, args []string) error {
 		Addr: *addr,
 		Handler: web.New(web.Options{
 			DB: d, Cache: cache, Dist: webdist.Dist(), ArtistMinWorks: *minWorks, BaseURL: *baseURL,
+			AdminUser: *adminUser, AdminPassword: adminPassword,
 		}).Handler(),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
