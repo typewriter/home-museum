@@ -44,9 +44,10 @@ func OriginURL(r Ref, width int) string {
 	}
 	switch r.Source {
 	case "aic":
-		// AIC は 1 回に返す面積を maxArea (3,109,500 px) までに絞っていて、超えると
-		// 403 を返す。幅指定 (1600,) だと縦長の作品で超える (1600×2605 ≒ 417 万)。
-		// 1600×1600 の枠に収める指定 (!1600,1600) なら最大 256 万で必ず収まる。
+		// AIC は原寸より大きく返す要求を 403 で断る (info.json の supports に
+		// sizeAboveFull が無い)。幅指定 (1600,) だと、幅が 1600px 未満の縦長の作品で
+		// 拡大の要求になる。1600×1600 の枠に収める指定 (!1600,1600) なら、長い辺が
+		// 1600px 以上の作品は縮小で済む。
 		if m := iiifSize.FindStringSubmatchIndex(r.ImageURL); m != nil {
 			return r.ImageURL[:m[2]] + fmt.Sprintf("!%d,%d", width, width) + r.ImageURL[m[3]:]
 		}
